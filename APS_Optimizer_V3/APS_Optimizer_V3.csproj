@@ -1,6 +1,6 @@
 <Project Sdk="Uno.Sdk">
   <PropertyGroup>
-  <TargetFrameworks>net8.0;net8.0-maccatalyst;net8.0-desktop</TargetFrameworks>
+  <TargetFrameworks>net8.0;net8.0-desktop</TargetFrameworks>
   <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64</RuntimeIdentifiers>
 
     <OutputType>Exe</OutputType>
