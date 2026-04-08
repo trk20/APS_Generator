@@ -6,7 +6,7 @@ namespace APS_Optimizer_V3.Services;
 
 public class CryptoMiniSatDownloader
 {
-    private const string GITHUB_API_URL = "https://api.github.com/repos/msoos/cryptominisat/releases/latest";
+    private const string GITHUB_API_URL = "https://api.github.com/repos/msoos/cryptominisat/releases/tags/release/5.13.0";
     private const string WINDOWS_EXE_NAME = "cryptominisat5.exe";
     private const string LINUX_EXE_NAME = "cryptominisat5";
 
