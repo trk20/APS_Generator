@@ -261,14 +261,16 @@ public class SolverService
     private string FormatDimacs(List<List<int>> clauses, int variableCount)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"p cnf {variableCount} {clauses.Count}");
+        // Use \n (Unix line endings) explicitly - DIMACS format and CryptoMiniSat
+        // expect LF-only line endings, not CRLF (which AppendLine() uses on Windows)
+        sb.Append($"p cnf {variableCount} {clauses.Count}\n");
         foreach (var clause in clauses)
         {
             // Check if clause is empty which is invalid DIMACS, shouldn't happen with correct logic
             if (clause.Any())
             {
                 sb.Append(string.Join(" ", clause));
-                sb.AppendLine(" 0");
+                sb.Append(" 0\n");
             }
             else
             {
