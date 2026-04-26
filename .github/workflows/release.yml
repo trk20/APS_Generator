@@ -57,6 +57,12 @@ jobs:
       # STATICCOMPILE=ON statically links dependencies (including GMP) into the DLL.
       # vcpkg provides GMP since the GitHub runner doesn't ship it.
 
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
+          key: vcpkg-gmp-${{ runner.os }}-v1
+
       - name: Install GMP via vcpkg
         run: vcpkg install gmp:x64-windows-static
 
