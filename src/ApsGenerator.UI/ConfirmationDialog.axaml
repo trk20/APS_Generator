@@ -1,0 +1,17 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ApsGenerator.UI.ConfirmationDialog"
+        Title="Confirm"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <LayoutTransformControl x:Name="RootTransform">
+    <StackPanel x:Name="RootPanel" Margin="24" Spacing="16" MaxWidth="400">
+        <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button Content="Continue" Click="OnContinue" Classes="accent" />
+            <Button Content="Cancel" Click="OnCancel" />
+        </StackPanel>
+    </StackPanel>
+    </LayoutTransformControl>
+</Window>

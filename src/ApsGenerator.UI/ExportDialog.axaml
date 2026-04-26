@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ApsGenerator.UI.ExportDialog"
+        Title="Export Blueprint"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        MinWidth="560">
+    <LayoutTransformControl x:Name="RootTransform">
+    <StackPanel x:Name="RootPanel" Margin="24" Spacing="12" Width="520">
+        <TextBlock Text="Blueprint Name" />
+        <TextBox x:Name="BlueprintNameBox" Watermark="Blueprint name" />
+
+        <TextBlock x:Name="TargetHeightLabel" Text="Clip/Loader length" />
+        <NumericUpDown x:Name="TargetHeightBox"
+                       FormatString="0"
+                       Minimum="1" Maximum="8" Value="2" Increment="1" />
+
+        <TextBlock x:Name="MaterialCostText"
+                   Text="Material cost: 0"
+                   FontWeight="SemiBold" />
+
+        <TextBlock Text="Save Location" />
+        <Grid ColumnDefinitions="*,Auto" >
+            <TextBox x:Name="SaveLocationBox" Grid.Column="0" Watermark="Folder path" />
+            <Button Grid.Column="1" Content="Browse..." Click="OnBrowse" Margin="4,0,0,0" />
+        </Grid>
+
+        <TextBlock x:Name="ErrorText"
+                   Foreground="#F44336"
+                   TextWrapping="Wrap"
+                   IsVisible="False" />
+
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Export" Click="OnExport" Classes="accent" />
+            <Button Content="Cancel" Click="OnCancel" />
+        </StackPanel>
+    </StackPanel>
+    </LayoutTransformControl>
+</Window>

@@ -1,0 +1,3 @@
+[submodule "native/cryptominisat"]
+	path = native/cryptominisat
+	url = https://github.com/trk20/cryptominisat.git

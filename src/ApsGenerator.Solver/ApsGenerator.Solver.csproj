@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ApsGenerator.Core\ApsGenerator.Core.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="runtimes/**/*" CopyToOutputDirectory="PreserveNewest" LinkBase="runtimes" Pack="true" PackagePath="runtimes" />
+    <None Include="runtimes/linux-x64/native/libcryptominisat5.so" CopyToOutputDirectory="PreserveNewest" Link="libcryptominisat5.so" />
+  </ItemGroup>
+
+</Project>

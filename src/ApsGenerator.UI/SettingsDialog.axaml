@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ApsGenerator.UI.ViewModels"
+        x:Class="ApsGenerator.UI.SettingsDialog"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Settings"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        MinWidth="560">
+    <LayoutTransformControl>
+        <LayoutTransformControl.LayoutTransform>
+            <ScaleTransform ScaleX="{Binding UiScale}" ScaleY="{Binding UiScale}" />
+        </LayoutTransformControl.LayoutTransform>
+    <StackPanel Margin="24" Spacing="12" Width="520">
+
+        <TextBlock Text="Thread Count" />
+        <NumericUpDown x:Name="ThreadCountBox"
+                   Value="{Binding ThreadCount}"
+                       Minimum="1" Maximum="{Binding MaxThreadCount}"
+                       Increment="1" FormatString="0"
+                       ToolTip.Tip="Number of CPU threads for the solver." />
+
+        <TextBlock Text="Max Time (seconds)"
+                   ToolTip.Tip="Maximum wall-clock time for the solver." />
+        <NumericUpDown Value="{Binding MaxTimeSeconds}"
+                       Minimum="1" Maximum="600" Increment="5"
+                       FormatString="0.#"
+                       ToolTip.Tip="Maximum wall-clock time for the solver. The solver will stop and return the best result found so far." />
+
+        <CheckBox Content="Early Stop Heuristic [Experimental]"
+                  IsChecked="{Binding EarlyStopEnabled}"
+                  ToolTip.Tip="Uses progressive patience to predict when further optimization is unlikely to succeed. Reduces total solve time by ~43% on average, with ~5% chance of stopping one step before the true optimum." />
+
+        <TextBlock Text="Number of Solutions" />
+        <NumericUpDown Value="{Binding NumSolutions}"
+                       Minimum="1" Maximum="50" Increment="1"
+                       FormatString="0"
+                       ToolTip.Tip="Enumerates multiple distinct optimal layouts. Time budget is shared — larger values may not complete all enumerations." />
+
+        <Separator />
+
+        <TextBlock Text="Default Export Clip/Loader Length (3/4-clip)" />
+        <NumericUpDown Value="{Binding DefaultExportHeightBasic}"
+                       Minimum="1" Maximum="8" Increment="1"
+                       FormatString="0" />
+
+        <TextBlock Text="Default Export Stack Height (5-clip)" />
+        <NumericUpDown x:Name="DefaultExportHeightFiveClipBox"
+                   Value="{Binding DefaultExportHeightFiveClip}"
+                       Minimum="3" Maximum="24" Increment="3"
+                   FormatString="0"
+                   ValueChanged="OnDefaultExportHeightFiveClipValueChanged" />
+
+        <TextBlock Text="Export Name Template" />
+        <TextBox Text="{Binding ExportNameTemplate}" />
+        <TextBlock Text="Tokens: {width}, {height}, {clips}, {count}, {targetHeight}"
+                   FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
+
+        <Separator />
+
+        <TextBlock Text="UI Scale"
+                   ToolTip.Tip="Scale multiplier for UI elements. Increase for high-DPI displays." />
+        <NumericUpDown Value="{Binding UiScale}"
+                       Minimum="0.5" Maximum="4" Increment="0.1"
+                       FormatString="0.##"
+                       ToolTip.Tip="Scale multiplier for UI elements. Increase for high-DPI displays." />
+
+
+        <Button Content="Save &amp; Close" Click="OnClose"
+                HorizontalAlignment="Right" Margin="0,8,0,0" />
+
+
+    </StackPanel>
+    </LayoutTransformControl>
+</Window>

@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ApsGenerator.Core/ApsGenerator.Core.csproj" />
+    <Project Path="src/ApsGenerator.Solver/ApsGenerator.Solver.csproj" />
+    <Project Path="src/ApsGenerator.UI/ApsGenerator.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ApsGenerator.Core.Tests/ApsGenerator.Core.Tests.csproj" />
+    <Project Path="tests/ApsGenerator.Solver.Tests/ApsGenerator.Solver.Tests.csproj" />
+    <Project Path="tests/ApsGenerator.UI.Tests/ApsGenerator.UI.Tests.csproj" />
+  </Folder>
+</Solution>

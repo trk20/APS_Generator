@@ -1,0 +1,130 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          include-prerelease: true
+
+      - name: Run tests
+        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=Slow'
+
+      # Linux native lib (libcryptominisat5.so) is already in runtimes/linux-x64/native/
+      - name: Publish
+        run: >
+          dotnet publish src/ApsGenerator.UI/ApsGenerator.UI.csproj
+          -c Release
+          -r linux-x64
+          --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Package
+        run: |
+          cd src/ApsGenerator.UI/bin/Release/net10.0/linux-x64/publish
+          zip -r "$GITHUB_WORKSPACE/APS-Generator-${{ inputs.version }}-linux-x64.zip" .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: APS-Generator-${{ inputs.version }}-linux-x64.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          include-prerelease: true
+
+      # --- CryptoMiniSat Windows build ---
+      # The Linux .so is checked in, but Windows needs a fresh build from source.
+      # STATICCOMPILE=ON statically links dependencies (including GMP) into the DLL.
+      # vcpkg provides GMP since the GitHub runner doesn't ship it.
+
+      - name: Install GMP via vcpkg
+        run: vcpkg install gmp:x64-windows-static
+
+      - name: Build CryptoMiniSat from source
+        shell: cmd
+        run: |
+          cd native\cryptominisat
+          cmake -B build -G "Visual Studio 17 2022" -A x64 ^
+            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake ^
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
+            -DENABLE_PYTHON_INTERFACE=OFF ^
+            -DSTATICCOMPILE=ON
+          cmake --build build --config Release --target cryptominisat5
+
+      # Copy the built DLL into the runtimes folder so dotnet publish picks it up
+      - name: Copy CMS DLL to runtimes
+        shell: pwsh
+        run: |
+          $src = Get-ChildItem -Path native/cryptominisat/build -Recurse -Filter "cryptominisat5.dll" | Select-Object -First 1
+          if (-not $src) { throw "cryptominisat5.dll not found in build output" }
+          $dest = "src/ApsGenerator.Solver/runtimes/win-x64/native"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item $src.FullName -Destination $dest
+          Write-Host "Copied $($src.FullName) -> $dest"
+
+      - name: Run tests
+        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=Slow'
+
+      - name: Publish
+        run: >
+          dotnet publish src/ApsGenerator.UI/ApsGenerator.UI.csproj
+          -c Release
+          -r win-x64
+          --self-contained
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "src/ApsGenerator.UI/bin/Release/net10.0/win-x64/publish/*" `
+            -DestinationPath "APS-Generator-${{ inputs.version }}-windows-x64.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: APS-Generator-${{ inputs.version }}-windows-x64.zip
+
+  release:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-x64
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x64
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}
+          files: |
+            APS-Generator-${{ inputs.version }}-linux-x64.zip
+            APS-Generator-${{ inputs.version }}-windows-x64.zip

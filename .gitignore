@@ -1,0 +1,29 @@
+.github/
+.vscode/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+# NuGet
+*.nupkg
+**/[Pp]ackages/*
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+
+# IDE
+.idea/
+*.swp
+*~
+
+# Native libs build artifacts
+native/build/
