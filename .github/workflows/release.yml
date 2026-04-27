@@ -97,6 +97,9 @@ jobs:
           ls -la "$DEST"
 
       - name: Run tests
+        shell: pwsh
+        env:
+          PATH: ${{ github.workspace }}\src\ApsGenerator.Solver\runtimes\win-x64\native;${{ env.PATH }}
         run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=Slow'
 
       - name: Publish
