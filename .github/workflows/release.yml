@@ -56,44 +56,43 @@ jobs:
           dotnet-version: "10.0.x"
           include-prerelease: true
 
-      # --- CryptoMiniSat Windows build ---
-      # The Linux .so is checked in, but Windows needs a fresh build from source.
-      # STATICCOMPILE=ON statically links dependencies (including GMP) into the DLL.
-      # vcpkg provides GMP since the GitHub runner doesn't ship it.
-
-      - name: Cache vcpkg packages
-        uses: actions/cache@v4
+      # --- CryptoMiniSat Windows build (MSYS2/MinGW) ---
+      - name: Setup MSYS2 (MinGW64)
+        uses: msys2/setup-msys2@v2
         with:
-          path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
-          key: vcpkg-gmp-${{ runner.os }}-v1
-
-      - name: Install GMP via vcpkg
-        run: vcpkg install gmp:x64-windows-static
-
-      - name: Install pkg-config
-        run: choco install pkgconfiglite -y
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            make
+            mingw-w64-x86_64-gmp
+            mingw-w64-x86_64-zlib
+            mingw-w64-x86_64-pkgconf
 
       - name: Build CryptoMiniSat from source
-        shell: cmd
+        shell: msys2 {0}
         run: |
-          cd native\cryptominisat
-          cmake -B build -G "Visual Studio 17 2022" -A x64 ^
-            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake ^
-            -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
-            -DENABLE_PYTHON_INTERFACE=OFF ^
-            -DSTATICCOMPILE=ON
-          cmake --build build --config Release --target cryptominisat5
+          cd native/cryptominisat
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_PYTHON_INTERFACE=OFF \
+            -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++"
+          cmake --build build --target cryptominisat5
 
-      # Copy the built DLL into the runtimes folder so dotnet publish picks it up
       - name: Copy CMS DLL to runtimes
         shell: pwsh
         run: |
-          $src = Get-ChildItem -Path native/cryptominisat/build -Recurse -Filter "cryptominisat5.dll" | Select-Object -First 1
-          if (-not $src) { throw "cryptominisat5.dll not found in build output" }
-          $dest = "src/ApsGenerator.Solver/runtimes/win-x64/native"
-          New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          Copy-Item $src.FullName -Destination $dest
-          Write-Host "Copied $($src.FullName) -> $dest"
+          $src = Get-ChildItem -Path native/cryptominisat/build -Recurse -File |
+            Where-Object { $_.Name -like "*cryptominisat5*.dll" } |
+            Select-Object -First 1
+          if (-not $src) { throw "No DLL matching *cryptominisat5* found in build output" }
+          $destDir = "src/ApsGenerator.Solver/runtimes/win-x64/native"
+          $destFile = Join-Path $destDir "cryptominisat5.dll"
+          New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+          Copy-Item -Path $src.FullName -Destination $destFile -Force
+          Write-Host "Copied $($src.FullName) -> $destFile"
 
       - name: Run tests
         run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=Slow'
