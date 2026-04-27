@@ -81,18 +81,20 @@ jobs:
             -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++"
           cmake --build build --target cryptominisat5
 
-      - name: Copy CMS DLL to runtimes
-        shell: pwsh
+      - name: Copy CMS DLL and dependencies to runtimes
+        shell: msys2 {0}
         run: |
-          $src = Get-ChildItem -Path native/cryptominisat/build -Recurse -File |
-            Where-Object { $_.Name -like "*cryptominisat5*.dll" } |
-            Select-Object -First 1
-          if (-not $src) { throw "No DLL matching *cryptominisat5* found in build output" }
-          $destDir = "src/ApsGenerator.Solver/runtimes/win-x64/native"
-          $destFile = Join-Path $destDir "cryptominisat5.dll"
-          New-Item -ItemType Directory -Force -Path $destDir | Out-Null
-          Copy-Item -Path $src.FullName -Destination $destFile -Force
-          Write-Host "Copied $($src.FullName) -> $destFile"
+          DEST="src/ApsGenerator.Solver/runtimes/win-x64/native"
+          mkdir -p "$DEST"
+          DLL="native/cryptominisat/build/cmsat5-src/libcryptominisat5win.dll"
+          cp "$DLL" "$DEST/cryptominisat5.dll"
+          # Copy MinGW runtime dependencies (libgmp, libwinpthread, etc.)
+          for dep in $(ldd "$DLL" | grep '/mingw64/' | awk '{print $3}'); do
+            cp "$dep" "$DEST/"
+            echo "Copied dependency: $(basename "$dep")"
+          done
+          echo "Contents of $DEST:"
+          ls -la "$DEST"
 
       - name: Run tests
         run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=Slow'
