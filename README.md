@@ -1,7 +1,5 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> Under maintenance for version 2.0 release
-
 # APS Generator
 
 This tool provides a simple, user-friendly method to easily generate density-optimized APS layouts for [From The Depths](https://store.steampowered.com/app/268650/From_The_Depths/).
