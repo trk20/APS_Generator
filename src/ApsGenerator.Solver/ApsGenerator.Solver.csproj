@@ -11,9 +11,12 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Include="runtimes/**/*" CopyToOutputDirectory="PreserveNewest" LinkBase="runtimes" Pack="true" PackagePath="runtimes" />
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOsPlatform('Linux')))">
     <None Include="runtimes/linux-x64/native/libcryptominisat5.so" CopyToOutputDirectory="PreserveNewest" Link="libcryptominisat5.so" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('win')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOsPlatform('Windows')))">
+    <None Include="runtimes/win-x64/native/*.dll" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

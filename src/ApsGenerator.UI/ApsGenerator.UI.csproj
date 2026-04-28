@@ -5,6 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ApplicationIcon>Assets/Icons/icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets/Icons/icon.ico" />
     <AvaloniaResource Include="Assets/Icons/loader.png" Link="Resources/loader.png" />
     <AvaloniaResource Include="Assets/Icons/clip.png" Link="Resources/clip.png" />
     <AvaloniaResource Include="Assets/Icons/connector.png" Link="Resources/connector.png" />

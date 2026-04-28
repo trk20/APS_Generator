@@ -27,3 +27,5 @@ x86/
 
 # Native libs build artifacts
 native/build/
+native/cryptominisat/build/
+src/ApsGenerator.Solver/runtimes/win-x64/
