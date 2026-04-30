@@ -194,7 +194,7 @@ For development, you'll need .NET 10 SDK and familiarity with [Avalonia UI](http
 
 ## Acknowledgements
 
-- Thanks to the developers of [CryptoMiniSat](https://github.com/msoos/cryptominisat) for their powerful SAT solver. This project includes a slightly modified version of CryptoMiniSat with additional C API hooks for interruption and timeout control.
+- Thanks to the developers of [CryptoMiniSat](https://github.com/msoos/cryptominisat) especially [@msoos](https://github.com/msoos) for their powerful SAT solver, which APS Generator uses for the bulk of the heavy computational lifting. The pull request containing modifications I needed for certain features was merged, so this project now points to the main CryptoMiniSat repo :)
 - Thanks to **sascha** on Stack Overflow for their [answer on a polyomino grid-packing question](https://stackoverflow.com/a/47934736) that served as the basis for the core solving logic.
 
 ## License
