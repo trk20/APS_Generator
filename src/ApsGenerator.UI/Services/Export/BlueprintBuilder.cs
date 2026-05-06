@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using ApsGenerator.Core.Models;
 
 namespace ApsGenerator.UI.Services.Export;
@@ -7,7 +8,37 @@ internal static class BlueprintBuilder
 {
     private sealed record EmittedBlock(int BlockId, int RotationCode, string BlockData, int MaterialCost);
 
-    public static BlueprintFile Build(IReadOnlyList<Placement> placements, Grid grid, TetrisType type, ExportOptions options)
+    // Block axis definitions (verified by BlockRotationTests)
+    private static readonly Vector3 LoaderPrimary = Vector3.UnitY;
+    private static readonly Vector3 LoaderSecondary = Vector3.UnitZ;
+    private static readonly Vector3 LoaderSecondaryTarget = Vector3.UnitY;
+
+    private static readonly Vector3 ClipPrimary = -Vector3.UnitY;
+    private static readonly Vector3 ClipSecondary = Vector3.UnitZ;
+    private static readonly Vector3 ClipHorizontalSecondaryTarget = Vector3.UnitY;
+    private static readonly Vector3 ClipVerticalSecondaryTarget = Vector3.UnitZ;
+
+    private static readonly Vector3 IntakePrimary = Vector3.UnitZ;
+    private static readonly Vector3 IntakeSecondary = Vector3.UnitY;
+
+    private static readonly Vector3 EjectorPrimary = Vector3.UnitZ;
+    private static readonly Vector3 EjectorSecondary = Vector3.UnitY;
+    private static readonly Vector3 EjectorSecondaryTarget = -Vector3.UnitY;
+
+    // Cooler_1 at BLR=0 connects Forward(+Z) and Back(-Z).
+    // For vertical stacking in 5-clip, orient to connect Up(+Y) and Down(-Y).
+    private static readonly int Cooler1VerticalBlr = BlockRotation.FindRotation(
+        Vector3.UnitZ, Vector3.UnitY);  // local Forward → world Up
+
+    // Default facing directions
+    private static readonly Vector3 DefaultLoaderTarget = -Vector3.UnitZ;
+    private static readonly Vector3 DefaultEjectorTarget = Vector3.UnitZ;
+
+    public static BlueprintFile Build(
+        IReadOnlyList<Placement> placements,
+        Grid grid,
+        TetrisType type,
+        ExportOptions options)
     {
         ArgumentNullException.ThrowIfNull(placements);
         ArgumentNullException.ThrowIfNull(grid);
@@ -55,10 +86,9 @@ internal static class BlueprintBuilder
         {
             ClusterShape shape = GetShape(shapes, placement, type);
             CellOffset loaderOffset = GetLoaderOffset(shape);
-            LogicalOrientation loaderOrientation =
-                type == TetrisType.ThreeClip
-                    ? DetermineThreeClipOpenDirection(shape)
-                    : LogicalOrientation.North;
+            Vector3 loaderTarget = type == TetrisType.ThreeClip
+                ? DetermineOpenDirection(shape)
+                : DefaultLoaderTarget;
 
             int loaderRow = placement.Row + loaderOffset.DeltaRow;
             int loaderCol = placement.Col + loaderOffset.DeltaCol;
@@ -66,15 +96,15 @@ internal static class BlueprintBuilder
             var reservedIntakePositions = new HashSet<(int X, int Z)>();
 
             string loaderKey = $"Loader_{targetHeight}";
-            EmitBlock(emittedBlocks, loaderX, 0, loaderZ, loaderKey, loaderOrientation);
+            int loaderBlr = BlockRotation.FindRotation(LoaderPrimary, loaderTarget, LoaderSecondary, LoaderSecondaryTarget);
+            EmitBlock(emittedBlocks, loaderX, 0, loaderZ, loaderKey, loaderBlr);
 
-            LogicalOrientation ejectorOrientation =
-                type == TetrisType.ThreeClip
-                    ? DetermineThreeClipEjectorOrientation(loaderOrientation)
-                    : LogicalOrientation.North;
-
-            EmitBlock(emittedBlocks, loaderX, -1, loaderZ, "Ejector_1", ejectorOrientation);
-            ReserveEjectorClearanceCell(reservedIntakePositions, loaderX, loaderZ, ejectorOrientation);
+            Vector3 ejectorTarget = type == TetrisType.ThreeClip
+                ? loaderTarget
+                : DefaultEjectorTarget;
+            int ejectorBlr = BlockRotation.FindRotation(EjectorPrimary, ejectorTarget, EjectorSecondary, EjectorSecondaryTarget);
+            EmitBlock(emittedBlocks, loaderX, -1, loaderZ, "Ejector_1", ejectorBlr);
+            ReserveEjectorClearanceCell(reservedIntakePositions, loaderX, loaderZ, ejectorTarget);
 
             foreach (CellOffset offset in shape.Offsets)
             {
@@ -85,12 +115,17 @@ internal static class BlueprintBuilder
                 int col = placement.Col + offset.DeltaCol;
                 (int gameX, int gameZ) = ToGameCoordinates(grid, row, col);
 
-                LogicalOrientation clipOrientation = DetermineOrientationTowardLoader(offset, loaderOffset);
+                Vector3 clipDirection = DetermineClipDirection(offset, loaderOffset);
                 string clipKey = $"Clip_{targetHeight}";
-                EmitBlock(emittedBlocks, gameX, 0, gameZ, clipKey, clipOrientation);
+                int clipBlr = BlockRotation.FindRotation(ClipPrimary, clipDirection, ClipSecondary, ClipHorizontalSecondaryTarget);
+                EmitBlock(emittedBlocks, gameX, 0, gameZ, clipKey, clipBlr, GameData.SharedClipBlockData);
 
                 if (!reservedIntakePositions.Contains((gameX, gameZ)))
-                    EmitBlock(emittedBlocks, gameX, -1, gameZ, "AmmoIntake_1", LogicalOrientation.Up);
+                {
+                    int intakeBlr = BlockRotation.FindRotation(IntakePrimary, Vector3.UnitY, IntakeSecondary, -Vector3.UnitZ);
+                    EmitBlock(emittedBlocks, gameX, -1, gameZ, "AmmoIntake_1", intakeBlr,
+                        GameData.GetAmmoIntakeBlockData(Vector3.UnitY));
+                }
             }
         }
     }
@@ -103,6 +138,14 @@ internal static class BlueprintBuilder
     {
         int sectionCount = targetHeight / 3;
         IReadOnlyList<ClusterShape> shapes = ClusterShape.GetShapes(TetrisType.FiveClip);
+
+        int clip1Up = BlockRotation.FindRotation(ClipPrimary, Vector3.UnitY, ClipSecondary, ClipVerticalSecondaryTarget);
+        int clip1Down = BlockRotation.FindRotation(ClipPrimary, -Vector3.UnitY, ClipSecondary, ClipVerticalSecondaryTarget);
+        int loaderSouth = BlockRotation.FindRotation(LoaderPrimary, Vector3.UnitZ, LoaderSecondary, LoaderSecondaryTarget);
+        int intakeUp = BlockRotation.FindRotation(IntakePrimary, Vector3.UnitY, IntakeSecondary, -Vector3.UnitZ);
+        int intakeDown = BlockRotation.FindRotation(IntakePrimary, -Vector3.UnitY, IntakeSecondary, Vector3.UnitZ);
+        string intakeUpBlockData = GameData.GetAmmoIntakeBlockData(Vector3.UnitY);
+        string intakeDownBlockData = GameData.GetAmmoIntakeBlockData(-Vector3.UnitY);
 
         foreach (Placement placement in placements)
         {
@@ -121,29 +164,41 @@ internal static class BlueprintBuilder
 
                     if (offset.Role == CellRole.Loader)
                     {
-                        EmitBlock(emittedBlocks, gameX, baseY, gameZ, "Clip_1", LogicalOrientation.Up);
-                        EmitBlock(emittedBlocks, gameX, baseY + 1, gameZ, "Loader_1", LogicalOrientation.South);
-                        EmitBlock(emittedBlocks, gameX, baseY + 2, gameZ, "Clip_1", LogicalOrientation.Down);
+                        EmitBlock(emittedBlocks, gameX, baseY, gameZ, "Clip_1", clip1Up, GameData.SharedClipBlockData);
+                        EmitBlock(emittedBlocks, gameX, baseY + 1, gameZ, "Loader_1", loaderSouth);
+                        EmitBlock(emittedBlocks, gameX, baseY + 2, gameZ, "Clip_1", clip1Down, GameData.SharedClipBlockData);
                         continue;
                     }
 
                     if (offset.Role == CellRole.Clip)
                     {
-                        LogicalOrientation towardLoader = DetermineOrientationTowardLoader(offset, loaderOffset);
+                        Vector3 clipDirection = DetermineClipDirection(offset, loaderOffset);
+                        int clipBlr = BlockRotation.FindRotation(ClipPrimary, clipDirection, ClipSecondary, ClipHorizontalSecondaryTarget);
 
-                        EmitBlock(emittedBlocks, gameX, baseY, gameZ, "AmmoIntake_1", LogicalOrientation.Up);
-                        EmitBlock(emittedBlocks, gameX, baseY + 1, gameZ, "Clip_1", towardLoader);
-                        EmitBlock(emittedBlocks, gameX, baseY + 2, gameZ, "AmmoIntake_1", LogicalOrientation.Down);
+                        EmitBlock(emittedBlocks, gameX, baseY, gameZ, "AmmoIntake_1", intakeUp, intakeUpBlockData);
+                        EmitBlock(emittedBlocks, gameX, baseY + 1, gameZ, "Clip_1", clipBlr, GameData.SharedClipBlockData);
+                        EmitBlock(emittedBlocks, gameX, baseY + 2, gameZ, "AmmoIntake_1", intakeDown, intakeDownBlockData);
                         continue;
                     }
 
-                    EmitBlock(emittedBlocks, gameX, baseY, gameZ, "Cooler_1", LogicalOrientation.West);
-                    EmitBlock(emittedBlocks, gameX, baseY + 1, gameZ, "Cooler_1", LogicalOrientation.West);
-                    EmitBlock(emittedBlocks, gameX, baseY + 2, gameZ, "Cooler_1", LogicalOrientation.West);
+                    EmitBlock(emittedBlocks, gameX, baseY, gameZ, "Cooler_1", Cooler1VerticalBlr);
+                    EmitBlock(emittedBlocks, gameX, baseY + 1, gameZ, "Cooler_1", Cooler1VerticalBlr);
+                    EmitBlock(emittedBlocks, gameX, baseY + 2, gameZ, "Cooler_1", Cooler1VerticalBlr);
                 }
             }
         }
     }
+
+    // Cardinal direction indices: 0=row-1, 1=col+1, 2=row+1, 3=col-1
+    // row-1 = North = Back, col+1 = East = Right, row+1 = South = Forward, col-1 = West = Left
+    private static Face CardinalToFace(int cardinalIndex) => cardinalIndex switch
+    {
+        0 => Face.Back,    // row-1 = North = construct Back
+        1 => Face.Right,   // col+1 = East = construct Right
+        2 => Face.Forward, // row+1 = South = construct Forward
+        3 => Face.Left,    // col-1 = West = construct Left
+        _ => Face.Forward,
+    };
 
     private static ClusterShape GetShape(IReadOnlyList<ClusterShape> shapes, Placement placement, TetrisType type)
     {
@@ -178,41 +233,20 @@ internal static class BlueprintBuilder
         int y,
         int z,
         string blockKey,
-        LogicalOrientation orientation)
+        int rotationCode,
+        string blockData = "")
     {
-        if (!GameData.Blocks.TryGetValue(blockKey, out BasicBlockDefinition? blockDefinition))
+        if (!GameData.Blocks.TryGetValue(blockKey, out BlockDefinition? blockDefinition))
             throw new InvalidOperationException($"Unknown block definition '{blockKey}'.");
-
-        int rotationCode = ResolveRotationCode(blockDefinition, orientation);
-        string blockData = ResolveBlockData(blockDefinition, orientation);
 
         emittedBlocks[(x, y, z)] =
             new EmittedBlock(blockDefinition.BlockId, rotationCode, blockData, blockDefinition.MaterialCost);
     }
 
-    private static int ResolveRotationCode(BasicBlockDefinition blockDefinition, LogicalOrientation orientation)
-    {
-        if (blockDefinition.RotationMap.TryGetValue(orientation, out int rotationCode))
-            return rotationCode;
-
-        return blockDefinition.DefaultRotationCode;
-    }
-
-    private static string ResolveBlockData(BasicBlockDefinition blockDefinition, LogicalOrientation orientation)
-    {
-        if (blockDefinition.BlockDataMap is not null &&
-            blockDefinition.BlockDataMap.TryGetValue(orientation, out string? blockDataByOrientation))
-        {
-            return blockDataByOrientation;
-        }
-
-        return blockDefinition.DefaultBlockData;
-    }
-
-    private static LogicalOrientation DetermineThreeClipOpenDirection(ClusterShape shape)
+    private static Vector3 DetermineOpenDirection(ClusterShape shape)
     {
         CellOffset loader = GetLoaderOffset(shape);
-        var occupiedDirections = new HashSet<LogicalOrientation>();
+        var occupiedDirections = new HashSet<Vector3>();
 
         foreach (CellOffset offset in shape.Offsets)
         {
@@ -221,91 +255,33 @@ internal static class BlueprintBuilder
 
             int deltaRow = offset.DeltaRow - loader.DeltaRow;
             int deltaCol = offset.DeltaCol - loader.DeltaCol;
-            occupiedDirections.Add(ToHorizontalOrientation(deltaRow, deltaCol));
+            occupiedDirections.Add(new Vector3(deltaCol, 0, deltaRow));
         }
 
-        LogicalOrientation[] allDirections =
-        [
-            LogicalOrientation.North,
-            LogicalOrientation.East,
-            LogicalOrientation.South,
-            LogicalOrientation.West
-        ];
-
-        foreach (LogicalOrientation direction in allDirections)
+        Vector3[] allDirections = [new(0, 0, -1), new(1, 0, 0), new(0, 0, 1), new(-1, 0, 0)];
+        foreach (Vector3 dir in allDirections)
         {
-            if (!occupiedDirections.Contains(direction))
-                return direction;
+            if (!occupiedDirections.Contains(dir))
+                return dir;
         }
 
         throw new InvalidOperationException("Unable to determine open direction for 3-clip shape.");
     }
 
-    private static LogicalOrientation DetermineOrientationTowardLoader(CellOffset fromOffset, CellOffset loaderOffset)
+    private static Vector3 DetermineClipDirection(CellOffset fromOffset, CellOffset loaderOffset)
     {
         int deltaRow = loaderOffset.DeltaRow - fromOffset.DeltaRow;
         int deltaCol = loaderOffset.DeltaCol - fromOffset.DeltaCol;
-        return ToHorizontalOrientation(deltaRow, deltaCol);
-    }
-
-    private static LogicalOrientation OppositeHorizontalOrientation(LogicalOrientation orientation)
-    {
-        return orientation switch
-        {
-            LogicalOrientation.North => LogicalOrientation.South,
-            LogicalOrientation.South => LogicalOrientation.North,
-            LogicalOrientation.East => LogicalOrientation.West,
-            LogicalOrientation.West => LogicalOrientation.East,
-            _ => throw new InvalidOperationException($"Unsupported horizontal orientation '{orientation}'.")
-        };
-    }
-
-    private static LogicalOrientation DetermineThreeClipEjectorOrientation(LogicalOrientation loaderOrientation)
-    {
-        if (loaderOrientation is LogicalOrientation.East or LogicalOrientation.West)
-            return loaderOrientation;
-
-        return OppositeHorizontalOrientation(loaderOrientation);
+        return new Vector3(deltaCol, 0, deltaRow);
     }
 
     private static void ReserveEjectorClearanceCell(
         HashSet<(int X, int Z)> reservedPositions,
         int ejectorX,
         int ejectorZ,
-        LogicalOrientation ejectorOrientation)
+        Vector3 ejectorTarget)
     {
-        LogicalOrientation clearanceDirection = OppositeHorizontalOrientation(ejectorOrientation);
-        (int deltaX, int deltaZ) = ToHorizontalOffset(clearanceDirection);
-        reservedPositions.Add((ejectorX + deltaX, ejectorZ + deltaZ));
-    }
-
-    private static (int DeltaX, int DeltaZ) ToHorizontalOffset(LogicalOrientation orientation)
-    {
-        return orientation switch
-        {
-            LogicalOrientation.North => (0, -1),
-            LogicalOrientation.South => (0, 1),
-            LogicalOrientation.East => (1, 0),
-            LogicalOrientation.West => (-1, 0),
-            _ => throw new InvalidOperationException($"Unsupported horizontal orientation '{orientation}'.")
-        };
-    }
-
-    private static LogicalOrientation ToHorizontalOrientation(int deltaRow, int deltaCol)
-    {
-        if (deltaRow == -1 && deltaCol == 0)
-            return LogicalOrientation.North;
-
-        if (deltaRow == 1 && deltaCol == 0)
-            return LogicalOrientation.South;
-
-        if (deltaRow == 0 && deltaCol == 1)
-            return LogicalOrientation.East;
-
-        if (deltaRow == 0 && deltaCol == -1)
-            return LogicalOrientation.West;
-
-        throw new InvalidOperationException($"Unsupported directional delta ({deltaRow}, {deltaCol}).");
+        reservedPositions.Add((ejectorX - (int)ejectorTarget.X, ejectorZ + (int)ejectorTarget.Z));
     }
 
     private static BlueprintFile AssembleBlueprint(
@@ -332,7 +308,7 @@ internal static class BlueprintBuilder
         int minZ = sortedCoordinates.Min(coord => coord.Z);
         int maxX = sortedCoordinates.Max(coord => coord.X);
         int maxZ = sortedCoordinates.Max(coord => coord.Z);
-        int maxY = targetHeight - 1;
+        int maxY = Math.Max(targetHeight - 1, sortedCoordinates.Max(coord => coord.Y));
 
         int sizeX = maxX - minX + 1;
         int sizeY = maxY - minY + 1;

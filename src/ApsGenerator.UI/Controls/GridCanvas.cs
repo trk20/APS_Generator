@@ -13,6 +13,7 @@ namespace ApsGenerator.UI.Controls;
 
 public sealed class GridCanvas : Control
 {
+    private const double CanvasRotationDegrees = 180;
     private const double DefaultZoomScale = 1.0;
     private const double MinZoomScale = 0.25;
     private const double MaxZoomScale = 8.0;
@@ -314,8 +315,8 @@ public sealed class GridCanvas : Control
             || position.X >= originX + renderWidth || position.Y >= originY + renderHeight)
             return false;
 
-        col = (int)((position.X - originX) / cellSize);
-        row = (int)((position.Y - originY) / cellSize);
+        col = ScreenToCol(position.X, grid.Width, cellSize, originX);
+        row = ScreenToRow(position.Y, grid.Height, cellSize, originY);
 
         return grid.IsInBounds(row, col);
     }
@@ -407,7 +408,7 @@ public sealed class GridCanvas : Control
         {
             for (var col = 0; col < grid.Width; col++)
             {
-                var rect = CellRect(row, col, cellSize, originX, originY);
+                var rect = CellRect(row, col, grid.Width, grid.Height, cellSize, originX, originY);
                 var brush = grid[row, col] == CellState.Blocked ? BlockedBrush : AvailableBrush;
                 context.FillRectangle(brush, rect);
             }
@@ -481,22 +482,22 @@ public sealed class GridCanvas : Control
 
             foreach (var (row, col, role, deltaRow, deltaCol) in clusterCells[clusterIndex])
             {
-                var rect = CellRect(row, col, cellSize, originX, originY);
+                var rect = CellRect(row, col, grid.Width, grid.Height, cellSize, originX, originY);
 
                 switch (role)
                 {
                     case CellRole.Loader:
                         context.FillRectangle(loaderBrush, rect);
-                        context.DrawImage(LoaderIcon, rect);
+                        DrawRotatedImage(context, LoaderIcon, rect, CanvasRotationDegrees);
                         break;
                     case CellRole.Clip:
                         context.FillRectangle(clipBrush, rect);
-                        var angle = GetClipRotation(deltaRow, deltaCol);
+                        var angle = GetClipRotation(deltaRow, deltaCol) + CanvasRotationDegrees;
                         DrawRotatedImage(context, ClipIcon, rect, angle);
                         break;
                     case CellRole.Connection:
                         context.FillRectangle(clipBrush, rect);
-                        context.DrawImage(ConnectorIcon, rect);
+                        DrawRotatedImage(context, ConnectorIcon, rect, CanvasRotationDegrees);
                         break;
                 }
             }
@@ -617,13 +618,13 @@ public sealed class GridCanvas : Control
     {
         for (var row = 0; row <= grid.Height; row++)
         {
-            var y = originY + row * cellSize;
+            var y = originY + ((grid.Height - row) * cellSize);
             context.DrawLine(GridLinePen, new Point(originX, y), new Point(originX + renderWidth, y));
         }
 
         for (var col = 0; col <= grid.Width; col++)
         {
-            var x = originX + col * cellSize;
+            var x = originX + ((grid.Width - col) * cellSize);
             context.DrawLine(GridLinePen, new Point(x, originY), new Point(x, originY + renderHeight));
         }
     }
@@ -740,8 +741,31 @@ public sealed class GridCanvas : Control
         return brush;
     }
 
-    private static Rect CellRect(int row, int col, double cellSize, double originX, double originY) =>
-        new(originX + (col * cellSize), originY + (row * cellSize), cellSize, cellSize);
+    private static double CellScreenX(int col, int gridWidth, double cellSize, double originX) =>
+        originX + ((gridWidth - 1 - col) * cellSize);
+
+    private static double CellScreenY(int row, int gridHeight, double cellSize, double originY) =>
+        originY + ((gridHeight - 1 - row) * cellSize);
+
+    private static int ScreenToCol(double screenX, int gridWidth, double cellSize, double originX) =>
+        gridWidth - 1 - (int)((screenX - originX) / cellSize);
+
+    private static int ScreenToRow(double screenY, int gridHeight, double cellSize, double originY) =>
+        gridHeight - 1 - (int)((screenY - originY) / cellSize);
+
+    private static Rect CellRect(
+        int row,
+        int col,
+        int gridWidth,
+        int gridHeight,
+        double cellSize,
+        double originX,
+        double originY) =>
+        new(
+            CellScreenX(col, gridWidth, cellSize, originX),
+            CellScreenY(row, gridHeight, cellSize, originY),
+            cellSize,
+            cellSize);
 
     private static Color BlendWithWhite(Color color, double colorWeight)
     {

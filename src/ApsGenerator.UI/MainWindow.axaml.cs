@@ -42,8 +42,7 @@ public partial class MainWindow : Window
 
     private async Task<bool> ShowConfirmationAsync(string message)
     {
-        var uiScale = (DataContext as ViewModels.MainWindowViewModel)?.UiScale ?? 1.0;
-        var dialog = new ConfirmationDialog(message, uiScale);
+        var dialog = new ConfirmationDialog(message);
         var result = await dialog.ShowDialog<bool>(this);
         return result;
     }
@@ -63,8 +62,7 @@ public partial class MainWindow : Window
             vm.LastExportFolder,
             vm.DefaultExportHeightBasic,
             vm.DefaultExportHeightFiveClip,
-            vm.ExportNameTemplate,
-            vm.UiScale);
+            vm.ExportNameTemplate);
 
         var exported = await dialog.ShowDialog<bool>(this);
         if (exported)

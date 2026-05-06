@@ -20,6 +20,8 @@ public partial class ExportDialog : Window
     private bool hasManualBlueprintNameEdit;
     private string? lastAutoBlueprintName;
 
+    private sealed record BomItem(string Label, string Cost);
+
     public ExportDialog()
     {
         InitializeComponent();
@@ -37,8 +39,7 @@ public partial class ExportDialog : Window
         string? lastExportFolder,
         int defaultHeightBasic = 2,
         int defaultHeightFiveClip = 3,
-        string? exportNameTemplate = null,
-        double uiScale = 1.0)
+        string? exportNameTemplate = null)
     {
         InitializeComponent();
 
@@ -47,7 +48,6 @@ public partial class ExportDialog : Window
         this.tetrisType = tetrisType;
         this.exportNameTemplate = exportNameTemplate ?? UserSettings.DefaultExportNameTemplate;
 
-        RootTransform.LayoutTransform = new ScaleTransform(uiScale, uiScale);
         InitializeDialog(lastExportFolder, defaultHeightBasic, defaultHeightFiveClip);
     }
 
@@ -64,7 +64,7 @@ public partial class ExportDialog : Window
         hasManualBlueprintNameEdit = false;
         UpdateAutoBlueprintName();
         SaveLocationBox.Text = ResolveDefaultFolder(lastExportFolder);
-        UpdateMaterialCost();
+        UpdateBillOfMaterials();
     }
 
     private void ConfigureForTetrisType(TetrisType type, int defaultHeightBasic, int defaultHeightFiveClip)
@@ -119,7 +119,7 @@ public partial class ExportDialog : Window
     private void OnTargetHeightValueChanged(object? sender, EventArgs e)
     {
         ClampFiveClipTargetHeight();
-        UpdateMaterialCost();
+        UpdateBillOfMaterials();
 
         if (hasManualBlueprintNameEdit)
             return;
@@ -149,7 +149,7 @@ public partial class ExportDialog : Window
         hasManualBlueprintNameEdit = true;
     }
 
-    private void UpdateMaterialCost()
+    private void UpdateBillOfMaterials()
     {
         int targetHeight = (int)(TargetHeightBox.Value ?? 2);
 
@@ -157,14 +157,76 @@ public partial class ExportDialog : Window
         {
             var previewOptions = new ExportOptions(BlueprintNameBox.Text ?? string.Empty, targetHeight);
             BlueprintFile previewBlueprint = BlueprintBuilder.Build(placements, grid, tetrisType, previewOptions);
-            long materialCost = Convert.ToInt64(Math.Round(previewBlueprint.SavedMaterialCost));
-            MaterialCostText.Text =
-                $"Material cost: {materialCost.ToString("N0", CultureInfo.InvariantCulture)}";
+
+            var idToBlock = new Dictionary<int, BlockDefinition>();
+            foreach (var (_, definition) in GameData.Blocks)
+                idToBlock[definition.BlockId] = definition;
+
+            var counts = previewBlueprint.Blueprint.BlockIds
+                .GroupBy(id => id)
+                .Select(group =>
+                {
+                    int count = group.Count();
+                    if (!idToBlock.TryGetValue(group.Key, out var definition))
+                    {
+                        return new
+                        {
+                            Name = $"Unknown ({group.Key})",
+                            Count = count,
+                            TotalCost = 0L
+                        };
+                    }
+
+                    return new
+                    {
+                        Name = FormatBlockName(definition.Name),
+                        Count = count,
+                        TotalCost = (long)count * definition.MaterialCost
+                    };
+                })
+                .OrderByDescending(item => item.TotalCost)
+                .ToList();
+
+            var bomItems = counts
+                .Select(item =>
+                    new BomItem(
+                        $"{item.Name} × {item.Count.ToString("N0", CultureInfo.InvariantCulture)}",
+                        item.TotalCost.ToString("N0", CultureInfo.InvariantCulture)))
+                .ToList();
+
+            BomList.ItemsSource = bomItems;
+
+            long totalCost = Convert.ToInt64(Math.Round(previewBlueprint.SavedMaterialCost));
+            TotalCostText.Text = totalCost.ToString("N0", CultureInfo.InvariantCulture);
         }
         catch
         {
-            MaterialCostText.Text = "Material cost: unavailable";
+            BomList.ItemsSource = null;
+            TotalCostText.Text = "unavailable";
         }
+    }
+
+    private static string FormatBlockName(string blockKey)
+    {
+        int underscoreIndex = blockKey.LastIndexOf('_');
+        if (underscoreIndex < 0)
+            return blockKey;
+
+        string baseName = blockKey[..underscoreIndex];
+        string suffix = blockKey[(underscoreIndex + 1)..];
+
+        var readable = new System.Text.StringBuilder();
+        foreach (char c in baseName)
+        {
+            if (char.IsUpper(c) && readable.Length > 0)
+                readable.Append(' ');
+            readable.Append(c);
+        }
+
+        if (baseName is "Loader" or "Clip")
+            return $"{readable} ({suffix}m)";
+
+        return readable.ToString();
     }
 
     private void OnDialogKeyDown(object? sender, KeyEventArgs e)

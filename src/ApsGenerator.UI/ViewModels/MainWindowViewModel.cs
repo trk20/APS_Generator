@@ -52,10 +52,10 @@ public partial class MainWindowViewModel : ObservableObject
     private double maxTimeSeconds = 30;
 
     [ObservableProperty]
-    private bool earlyStopEnabled = true;
+    private double uiScale = 1.0;
 
     [ObservableProperty]
-    private bool isMaximize = true;
+    private bool earlyStopEnabled = true;
 
     [ObservableProperty]
     private int targetPlacementCount;
@@ -96,6 +96,7 @@ public partial class MainWindowViewModel : ObservableObject
     private bool suppressRatioUpdate;
     private double targetRatio = 1.0;
     private bool hasTargetRatio;
+    private bool applyMaximizeFromSettings;
 
     [ObservableProperty]
     private bool canExport;
@@ -138,14 +139,13 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string exportNameTemplate = UserSettings.DefaultExportNameTemplate;
 
-    [ObservableProperty]
-    private double _uiScale = 1.0;
-
     public int MaxThreadCount => Math.Max(1, Environment.ProcessorCount - 1);
 
     public Func<string, Task<bool>>? ConfirmAsync { get; set; }
 
     public Func<Task>? ShowExportDialogAsync { get; set; }
+
+    public Action<double>? ScaleChanged { get; set; }
 
     public int SliderMaximum => MaxPlacements;
 
@@ -155,7 +155,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     public bool IsSymmetryEnabled => SelectedSymmetryType.Value != SymmetryType.None;
 
-    public bool IsSliderEnabled => !IsMaximize;
+    public bool IsMaximize => MaxPlacements > 0 && TargetPlacementCount >= MaxPlacements;
 
     public bool IsRotation90NonSquareWarning =>
         SelectedSymmetryType.Value == SymmetryType.Rotation90 && Grid.Width != Grid.Height;
@@ -168,11 +168,11 @@ public partial class MainWindowViewModel : ObservableObject
     {
         get
         {
-            if (IsMaximize)
-                return "Maximize";
-
             if (MaxPlacements == 0)
                 return "0 / 0 (0%)";
+
+            if (IsMaximize)
+                return "Maximize";
 
             var percent = (int)Math.Round(100.0 * TargetPlacementCount / MaxPlacements);
             return $"{TargetPlacementCount} / {MaxPlacements} ({percent}%)";
@@ -264,11 +264,12 @@ public partial class MainWindowViewModel : ObservableObject
             defaults.MaxTimeSeconds,
             MinSolverSeconds,
             MaxSolverSeconds);
+        UiScale = settings.UiScale;
 
-        IsMaximize = settings.IsMaximize;
         TargetPlacementCount = settings.TargetPlacementCount >= 0
             ? settings.TargetPlacementCount
             : defaults.TargetPlacementCount;
+        applyMaximizeFromSettings = settings.IsMaximize;
 
         PaintMode = ResolveEnum(settings.PaintMode, defaults.PaintMode);
         LastExportFolder = settings.LastExportFolder;
@@ -284,7 +285,6 @@ public partial class MainWindowViewModel : ObservableObject
             ? defaults.ExportNameTemplate
             : settings.ExportNameTemplate;
         NumSolutions = ResolveInt(settings.NumSolutions, defaults.NumSolutions, 1, 50);
-        UiScale = ResolveDouble(settings.UiScale, defaults.UiScale, 0.5, 4.0);
     }
 
     private static EnumDisplayItem<TEnum> ResolveDisplayItem<TEnum>(
@@ -399,7 +399,23 @@ public partial class MainWindowViewModel : ObservableObject
         int newMaxPlacements = GetTheoreticalMaxClusters(SelectedTetrisType.Value, Grid.AvailableCellCount);
         MaxPlacements = newMaxPlacements;
 
-        if (IsMaximize)
+        if (applyMaximizeFromSettings)
+        {
+            applyMaximizeFromSettings = false;
+            suppressRatioUpdate = true;
+            try
+            {
+                TargetPlacementCount = MaxPlacements;
+            }
+            finally
+            {
+                suppressRatioUpdate = false;
+            }
+
+            targetRatio = 1.0;
+            hasTargetRatio = true;
+        }
+        else if (IsMaximize)
         {
             suppressRatioUpdate = true;
             try
@@ -420,6 +436,7 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SliderMaximum));
         OnPropertyChanged(nameof(SliderMinimum));
         OnPropertyChanged(nameof(DensityDisplayText));
+        OnPropertyChanged(nameof(IsMaximize));
     }
 
     private void EnsureTargetRatioInitialized()
@@ -454,7 +471,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         TetrisType.ThreeClip => availableCells / 4,
         TetrisType.FourClip => availableCells / 5,
-        TetrisType.FiveClip => 2 * availableCells / 9,
+        TetrisType.FiveClip => (2 * availableCells) / 9,
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported tetris type.")
     };
 
@@ -829,16 +846,9 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsPaintModeToggle));
     }
 
-    partial void OnIsMaximizeChanged(bool value)
+    partial void OnUiScaleChanged(double value)
     {
-        if (!value && MaxPlacements > 0)
-        {
-            EnsureTargetRatioInitialized();
-            SetTargetPlacementCountFromRatio();
-        }
-
-        OnPropertyChanged(nameof(IsSliderEnabled));
-        OnPropertyChanged(nameof(DensityDisplayText));
+        ScaleChanged?.Invoke(value);
     }
 
     partial void OnGridChanged(Grid value)
@@ -853,6 +863,7 @@ public partial class MainWindowViewModel : ObservableObject
         if (MaxPlacements <= 0)
         {
             OnPropertyChanged(nameof(DensityDisplayText));
+            OnPropertyChanged(nameof(IsMaximize));
             return;
         }
 
@@ -870,6 +881,7 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         OnPropertyChanged(nameof(DensityDisplayText));
+        OnPropertyChanged(nameof(IsMaximize));
     }
 
     partial void OnMaxPlacementsChanged(int value) =>

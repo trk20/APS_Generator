@@ -32,13 +32,7 @@ public partial class SettingsDialog : Window
             OnDialogKeyDown,
             RoutingStrategies.Tunnel,
             handledEventsToo: true);
-
-        Opened += OnDialogOpened;
-    }
-
-    private void OnDialogOpened(object? sender, EventArgs e)
-    {
-        ThreadCountBox.Focus();
+        Opened += (_, _) => RootPanel.Focus();
     }
 
     private void OnClose(object? sender, RoutedEventArgs e)
