@@ -16,9 +16,23 @@
                        FormatString="0"
                        Minimum="1" Maximum="8" Value="2" Increment="1" />
 
-        <TextBlock x:Name="MaterialCostText"
-                   Text="Material cost: 0"
-                   FontWeight="SemiBold" />
+        <TextBlock Text="Bill of Materials" FontWeight="SemiBold" />
+        <ItemsControl x:Name="BomList" Margin="8,0,0,0">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding Label}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Cost}" HorizontalAlignment="Right" />
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Separator />
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="Total" FontWeight="SemiBold" />
+            <TextBlock x:Name="TotalCostText" Grid.Column="1" Text="0" FontWeight="SemiBold" HorizontalAlignment="Right" />
+        </Grid>
+        <Separator Margin="0,4" />
 
         <TextBlock Text="Save Location" />
         <Grid ColumnDefinitions="*,Auto" >

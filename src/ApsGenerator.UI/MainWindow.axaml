@@ -11,11 +11,38 @@
         Width="1024" Height="768"
         MinWidth="800" MinHeight="600">
 
+    <Window.Styles>
+        <Style Selector="HeaderedContentControl.section">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="#2A2A2E"
+                            BorderBrush="#3F3F46"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            ClipToBounds="True">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Top"
+                                    Background="#0f0f0f"
+                                    Padding="12,6">
+                                <ContentPresenter Content="{Binding Header, RelativeSource={RelativeSource TemplatedParent}}"
+                                                  FontWeight="SemiBold" FontSize="13" />
+                            </Border>
+                            <Border Padding="12,8">
+                                <ContentPresenter Content="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" />
+                            </Border>
+                        </DockPanel>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+    </Window.Styles>
+
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+G" Command="{Binding GenerateCommand}" />
         <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
         <KeyBinding Gesture="Left" Command="{Binding PrevSolutionCommand}" />
         <KeyBinding Gesture="Right" Command="{Binding NextSolutionCommand}" />
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding ToggleCoolerOverlayCommand}" />
     </Window.KeyBindings>
 
     <LayoutTransformControl>
@@ -27,22 +54,22 @@
             <MenuItem Header="_Settings" Click="OnSettingsClick" />
         </Menu>
 
-        <Grid ColumnDefinitions="280,*">
+        <Grid ColumnDefinitions="320,*">
 
         <!-- Left Panel -->
-        <ScrollViewer Grid.Column="0">
-            <StackPanel Margin="12" Spacing="12">
+        <Border Grid.Column="0" Margin="4" VerticalAlignment="Top">
+            <ScrollViewer MaxHeight="{Binding $parent[Grid].Bounds.Height}">
+                <StackPanel Margin="4" Spacing="8">
 
-                <!-- Template Section -->
-                <Expander IsExpanded="True" HorizontalAlignment="Stretch">
-                    <Expander.Header>
-                        <TextBlock Text="Template" FontWeight="Bold" FontSize="16" />
-                    </Expander.Header>
-                    <StackPanel Spacing="8" Margin="0,8,0,0">
-                        <TextBlock Text="Shape" />
+                <!-- TEMPLATE section -->
+                <HeaderedContentControl Classes="section" Header="Template">
+                    <StackPanel Spacing="8">
+
+                        <TextBlock Text="Shape" FontSize="12" Foreground="#AAAAAA" />
                         <ComboBox ItemsSource="{x:Static models:TemplateShapeValues.All}"
                                   SelectedItem="{Binding TemplateShape}"
-                                  HorizontalAlignment="Stretch">
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="Base template shape for the grid">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding DisplayName}" />
@@ -50,23 +77,20 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
 
-                        <TextBlock Text="Width" />
-                        <NumericUpDown Value="{Binding TemplateWidth}"
-                                       Minimum="3" Maximum="50" Increment="1"
-                                       FormatString="0" />
-
-                        <TextBlock Text="Height" />
-                        <Grid ColumnDefinitions="*,Auto">
-                            <NumericUpDown Value="{Binding TemplateHeight}"
+                        <Grid ColumnDefinitions="*,Auto,*">
+                            <NumericUpDown Grid.Column="0" Value="{Binding TemplateWidth}"
+                                           Minimum="3" Maximum="50" Increment="1" FormatString="0"
+                                           ToolTip.Tip="Grid width" />
+                            <ToggleButton Grid.Column="1" IsChecked="{Binding IsHeightLocked, Mode=TwoWay}"
+                                          Content="⇔" FontSize="14" Padding="6,2"
+                                          ToolTip.Tip="Lock dimensions together" />
+                            <NumericUpDown Grid.Column="2" Value="{Binding TemplateHeight}"
                                            IsEnabled="{Binding IsHeightEditable}"
-                                           Minimum="3" Maximum="50" Increment="1"
-                                           FormatString="0" />
-                            <CheckBox Grid.Column="1" Content="Lock"
-                                      IsChecked="{Binding IsHeightLocked}"
-                                      VerticalAlignment="Center" Margin="4,0,0,0" />
+                                           Minimum="3" Maximum="50" Increment="1" FormatString="0"
+                                           ToolTip.Tip="Grid height" />
                         </Grid>
 
-                        <TextBlock Text="Paint Mode" />
+                        <TextBlock Text="Paint Mode" FontSize="12" Foreground="#AAAAAA" />
                         <StackPanel Orientation="Horizontal" Spacing="4">
                             <RadioButton Content="Block" GroupName="PaintMode"
                                          IsChecked="{Binding IsPaintModeBlock, Mode=OneWay}"
@@ -87,22 +111,20 @@
 
                         <Button Content="Reset to Template"
                                 Command="{Binding ResetToTemplateCommand}"
-                                HorizontalAlignment="Stretch" />
+                                HorizontalAlignment="Stretch"
+                                ToolTip.Tip="Reset grid to the selected template shape" />
                     </StackPanel>
-                </Expander>
+                </HeaderedContentControl>
 
-                <Separator />
+                <!-- SOLVER section -->
+                <HeaderedContentControl Classes="section" Header="Solver">
+                    <StackPanel Spacing="8">
 
-                <!-- Solver Section -->
-                <Expander IsExpanded="True" HorizontalAlignment="Stretch">
-                    <Expander.Header>
-                        <TextBlock Text="Solver" FontWeight="Bold" FontSize="16" />
-                    </Expander.Header>
-                    <StackPanel Spacing="8" Margin="0,8,0,0">
-                        <TextBlock Text="Tetris Type" />
+                        <TextBlock Text="Tetris Type" FontSize="12" Foreground="#AAAAAA" />
                         <ComboBox ItemsSource="{x:Static vm:EnumValues.TetrisTypes}"
                                   SelectedItem="{Binding SelectedTetrisType}"
-                                  HorizontalAlignment="Stretch">
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="Tetromino piece type used by the solver">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding DisplayName}" />
@@ -110,76 +132,68 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
 
-                        <TextBlock Text="Symmetry Type" />
-                        <ComboBox ItemsSource="{x:Static vm:EnumValues.SymmetryTypes}"
-                                  SelectedItem="{Binding SelectedSymmetryType}"
-                                  HorizontalAlignment="Stretch">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding DisplayName}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
+                        <TextBlock Text="Symmetry" FontSize="12" Foreground="#AAAAAA" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <ComboBox Grid.Column="0" ItemsSource="{x:Static vm:EnumValues.SymmetryTypes}"
+                                      SelectedItem="{Binding SelectedSymmetryType}"
+                                      HorizontalAlignment="Stretch"
+                                      ToolTip.Tip="Symmetry constraint for placement">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <CheckBox Grid.Column="1" Content="Hard"
+                                      IsChecked="{Binding IsHardSymmetry}"
+                                      IsEnabled="{Binding IsSymmetryEnabled}"
+                                      VerticalAlignment="Center" Margin="8,0,0,0"
+                                      ToolTip.Tip="Hard: every placement must have a valid symmetric counterpart. Soft: symmetric pairs are preferred but asymmetric placements are allowed where the counterpart would be invalid." />
+                        </Grid>
 
                         <TextBlock Text="⚠ Rotation90 requires a square grid"
-                                   Foreground="#FF9800"
-                                   FontSize="12"
-                                   TextWrapping="Wrap"
+                                   Foreground="#FF9800" FontSize="11" TextWrapping="Wrap"
                                    IsVisible="{Binding IsRotation90NonSquareWarning}" />
 
-                        <CheckBox Content="Hard Symmetry"
-                                  IsChecked="{Binding IsHardSymmetry}"
-                                  IsEnabled="{Binding IsSymmetryEnabled}"
-                                  ToolTip.Tip="Hard: every placement must have a valid symmetric counterpart. Soft: symmetric pairs are preferred but asymmetric placements are allowed where the counterpart would be invalid." />
-
-                        <CheckBox Content="Maximize"
-                                  IsChecked="{Binding IsMaximize}"
-                                  ToolTip.Tip="When checked, the solver finds the maximum number of placements. When unchecked, use the slider to set a specific target." />
-
-                        <TextBlock Text="Target Density"
-                                   ToolTip.Tip="Number of cluster placements to target. The solver will try to place exactly this many clusters." />
+                        <TextBlock Text="Density" FontSize="12" Foreground="#AAAAAA" />
+                        <TextBlock Text="{Binding DensityDisplayText}" Margin="0,0,0,-4" />
                         <Slider Minimum="{Binding SliderMinimum}"
                                 Maximum="{Binding SliderMaximum}"
                                 TickFrequency="1"
                                 IsSnapToTickEnabled="True"
-                                IsEnabled="{Binding IsSliderEnabled}"
-                                Value="{Binding TargetPlacementCount}" />
-                        <TextBlock Text="{Binding DensityDisplayText}" />
+                                Value="{Binding TargetPlacementCount}"
+                                ToolTip.Tip="Target number of pieces to place. Maximum = maximize." />
+
+                        <Separator Margin="0,4" />
+
+                        <TextBlock Text="Solutions" FontSize="12" Foreground="#AAAAAA" />
+                        <NumericUpDown Value="{Binding NumSolutions}"
+                                       Minimum="1" Maximum="50" Increment="1"
+                                       FormatString="0" HorizontalAlignment="Stretch" Margin="0,0,0,4"
+                                       ToolTip.Tip="Number of solutions to generate" />
+
+                        <Button Content="Generate (Ctrl+G)"
+                                Command="{Binding GenerateCommand}"
+                                HorizontalAlignment="Stretch"
+                                Classes="accent" />
+
+                        <Button Content="Cancel (Esc)"
+                                Command="{Binding CancelCommand}"
+                                IsVisible="{Binding IsGenerating}"
+                                HorizontalAlignment="Stretch" />
+
+                        <ProgressBar IsIndeterminate="True"
+                                     IsVisible="{Binding IsGenerating}"
+                                     Height="4" />
                     </StackPanel>
-                </Expander>
+                </HeaderedContentControl>
 
-                <Separator />
-
-                <!-- Actions -->
-                <StackPanel Spacing="8">
-                    <Button Content="Generate (Ctrl+G)"
-                            Command="{Binding GenerateCommand}"
-                            HorizontalAlignment="Stretch"
-                            Classes="accent" />
-
-                    <Button Content="Cancel (Esc)"
-                            Command="{Binding CancelCommand}"
-                            IsVisible="{Binding IsGenerating}"
-                            HorizontalAlignment="Stretch" />
-
-                    <Button Content="Export Blueprint"
-                            Command="{Binding ExportCommand}"
-                            HorizontalAlignment="Stretch" />
-
-                    <ProgressBar IsIndeterminate="True"
-                                 IsVisible="{Binding IsGenerating}"
-                                 Height="4" />
-                </StackPanel>
-
-                <Separator />
-
-                <!-- Status Section -->
-                <Expander IsExpanded="True" HorizontalAlignment="Stretch">
-                    <Expander.Header>
-                        <TextBlock Text="Status" FontWeight="Bold" FontSize="16" />
-                    </Expander.Header>
-                    <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <StackPanel Orientation="Horizontal" Spacing="4">
+                <!-- STATUS section (only visible after solve) -->
+                <HeaderedContentControl Classes="section" Header="Status"
+                                        IsVisible="{Binding HasSolverRun}">
+                    <StackPanel Spacing="4">
+                        <StackPanel Orientation="Horizontal" Spacing="4"
+                                    IsVisible="{Binding PlacedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                             <TextBlock Text="Placed:" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding PlacedText}" />
                         </StackPanel>
@@ -188,7 +202,8 @@
                             <TextBlock Text="{Binding StatusLabel}"
                                        Foreground="{Binding StatusForeground}" />
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="4">
+                        <StackPanel Orientation="Horizontal" Spacing="4"
+                                    IsVisible="{Binding ElapsedTimeText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                             <TextBlock Text="Time:" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding ElapsedTimeText}" />
                         </StackPanel>
@@ -197,10 +212,23 @@
                                    Foreground="#F44336"
                                    IsVisible="{Binding StatusDetailText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
-                </Expander>
+                </HeaderedContentControl>
 
-            </StackPanel>
-        </ScrollViewer>
+                <!-- EXPORT section -->
+                <HeaderedContentControl Classes="section" Header="Export">
+                    <StackPanel Spacing="8">
+
+                        <Button Content="Export Blueprint"
+                                Command="{Binding ExportCommand}"
+                                Classes="accent"
+                                HorizontalAlignment="Stretch"
+                                ToolTip.Tip="Export the current solution as a game blueprint" />
+                    </StackPanel>
+                </HeaderedContentControl>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
 
         <Grid Grid.Column="1" RowDefinitions="Auto,*">
             <StackPanel Grid.Row="0"
@@ -224,7 +252,8 @@
                                  PaintMode="{Binding PaintMode}"
                                  SolverResult="{Binding SolverResult}"
                                  TetrisType="{Binding SelectedTetrisType.Value}"
-                                 SymmetryType="{Binding SelectedSymmetryType.Value}" />
+                                 SymmetryType="{Binding SelectedSymmetryType.Value}"
+                                 />
         </Grid>
 
     </Grid>

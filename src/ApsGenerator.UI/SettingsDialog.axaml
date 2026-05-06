@@ -12,14 +12,18 @@
         <LayoutTransformControl.LayoutTransform>
             <ScaleTransform ScaleX="{Binding UiScale}" ScaleY="{Binding UiScale}" />
         </LayoutTransformControl.LayoutTransform>
-    <StackPanel Margin="24" Spacing="12" Width="520">
+    <StackPanel Margin="24" Spacing="12" Width="520" Focusable="True" x:Name="RootPanel">
 
         <TextBlock Text="Thread Count" />
-        <NumericUpDown x:Name="ThreadCountBox"
-                   Value="{Binding ThreadCount}"
-                       Minimum="1" Maximum="{Binding MaxThreadCount}"
-                       Increment="1" FormatString="0"
-                       ToolTip.Tip="Number of CPU threads for the solver." />
+        <Grid ColumnDefinitions="*,Auto" ToolTip.Tip="Number of CPU threads for the solver.">
+            <Slider Grid.Column="0"
+                Value="{Binding ThreadCount}"
+                Minimum="1" Maximum="{Binding MaxThreadCount}"
+                TickFrequency="1"
+                IsSnapToTickEnabled="True" />
+            <TextBlock Grid.Column="1" Text="{Binding ThreadCount, StringFormat='{}{0:0}'}"
+                       VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="20" />
+        </Grid>
 
         <TextBlock Text="Max Time (seconds)"
                    ToolTip.Tip="Maximum wall-clock time for the solver." />

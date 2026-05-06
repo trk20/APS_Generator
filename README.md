@@ -61,11 +61,7 @@ Releases are **self-contained** - no .NET runtime installation required.
 
 ## Usage
 
-### Solver Parameters
-
-![interface-solve-parameters](readme-images/interface-solve-parameters.png)
-
-#### Grid Editor (1)
+#### Grid Editor
 
 Paint (click-and-drag) or toggle cells between blocked and clear for fully custom templates.
 
@@ -73,7 +69,7 @@ Cells follow symmetry rules if enabled.
 
 ![custom-template](readme-images/custom-template.png)
 
-#### Template Options (2)
+#### Template Options
 
 - **Shape** - Choose template shape to start from (circle with/without center hole, rectangle).
 - **Width/Height** - Adjust grid dimensions
@@ -81,7 +77,7 @@ Cells follow symmetry rules if enabled.
 - **Paint Mode** - Choose between painting blocked cells, clear cells, or individual cell toggling.
 - **Reset to Template** - Reset the grid to the default pattern for the selected shape.
 
-#### Solver Options (3)
+#### Solver Options
 
 - **Tetris Type** - Choose between 3-clip, 4-clip, and 5-clip tetris.
 - **Target Density/Maximize toggle** - Set a target density for the solver to aim for, or toggle to maximize density without a specific target.
@@ -99,26 +95,16 @@ Cells follow symmetry rules if enabled.
 | Hard Symmetry             | ![hard-result](readme-images/reflexive-symmetry.png) |
 | Soft Symmetry             | ![soft-result](readme-images/soft-symmetry.png)      |
 
-**Rotational Symmetry (90°/180°)**
-
-| Symmetry (Blank)                            | Example Solution                                          |
-| ------------------------------------------- | --------------------------------------------------------- |
-| ![rotational](readme-images/rotational.png) | ![rotational-result](readme-images/rotational-result.png) |
-
-**Reflexive Symmetry (Vertical/Horizontal/Quadrants)**
-
-| Symmetry (Blank)                          | Example Solution                                        |
-| ----------------------------------------- | ------------------------------------------------------- |
-| ![reflexive](readme-images/reflexive.png) | ![reflexive-result](readme-images/reflexive-result.png) |
+- **Number of Solutions** - Set how many distinct solutions the solver should generate before stopping. The solver will attempt to find multiple unique layouts that meet the specified parameters (note - this is significantly faster than generating multiple times, around ~50% extra time for 10 solutions instead of 1). After generating, you can cycle through the different solutions using the left and right arrow buttons above the result display. If less unique solutions exist than the number requested, the solver will return all unique solutions.
 
 ## Additional Settings
 
 Access additional settings in the **Settings** menu:
+
 ![settings-menu](readme-images/settings-menu.png)
 
 - **Thread Count** - Adjust the number of threads used for solving. More threads can speed up solving, especially for larger grids and higher clip counts, but will increase CPU usage.
 - **Max Time** - Set a maximum time limit for the solver to run. If the solver exceeds this time, it will stop and return the best solution found so far.
-- **Number of Solutions** - Set how many distinct solutions the solver should generate before stopping. The solver will attempt to find multiple unique layouts that meet the specified parameters (note - this is significantly faster than generating multiple times, around ~50% extra time for 10 solutions instead of 1). After generating, you can cycle through the different solutions using the left and right arrow buttons above the result display.
 - **Early Stop Heuristic** - Enable an experimental heuristic that can significantly reduce solve time in some cases by stopping early when a solution is found that meets certain criteria. In testing this reduced solve time by around 40% on average with a ~5% chance of missing the optimal solution.
 - **Default Export Clip/Loader Length** - Set the default clip and loader lengths for exported blueprints using 3 and 4-clip tetris.
 - **Default Export Stack Height** - Set the default stack height for exported blueprints using 5-clip tetris.

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Text.Json;
 using ApsGenerator.Core;
 using ApsGenerator.Core.Models;
@@ -129,7 +130,7 @@ public sealed class BlueprintExportTests
         int ejectorId = GameData.Blocks["Ejector_1"].BlockId;
         var shape = ClusterShape.GetShapes(TetrisType.ThreeClip)[placements[0].ShapeIndex];
         CellOffset loaderOffset = shape.Offsets.Single(offset => offset.Role == CellRole.Loader);
-        var occupiedDirections = new HashSet<LogicalOrientation>();
+        var occupiedDirections = new HashSet<Vector3>();
 
         foreach (CellOffset offset in shape.Offsets)
         {
@@ -138,20 +139,19 @@ public sealed class BlueprintExportTests
 
             int deltaRow = offset.DeltaRow - loaderOffset.DeltaRow;
             int deltaCol = offset.DeltaCol - loaderOffset.DeltaCol;
-            occupiedDirections.Add(ToHorizontalOrientation(deltaRow, deltaCol));
+            occupiedDirections.Add(new Vector3(deltaCol, 0, deltaRow));
         }
 
-        LogicalOrientation[] allDirections =
+        Vector3[] allDirections =
         [
-            LogicalOrientation.North,
-            LogicalOrientation.East,
-            LogicalOrientation.South,
-            LogicalOrientation.West
+            new(0, 0, -1),
+            new(1, 0, 0),
+            new(0, 0, 1),
+            new(-1, 0, 0)
         ];
 
-        LogicalOrientation loaderOrientation = allDirections.Single(direction => !occupiedDirections.Contains(direction));
-        LogicalOrientation expectedEjectorOrientation = OppositeHorizontalOrientation(loaderOrientation);
-        int expectedRotation = GameData.Blocks["Ejector_1"].RotationMap[expectedEjectorOrientation];
+        Vector3 loaderDirection = allDirections.Single(direction => !occupiedDirections.Contains(direction));
+        int expectedRotation = BlockRotation.FindRotation(Vector3.UnitZ, loaderDirection, Vector3.UnitY, -Vector3.UnitY);
 
         int ejectorIndex = blueprint.Blueprint.BlockIds.FindIndex(blockId => blockId == ejectorId);
 
@@ -173,13 +173,13 @@ public sealed class BlueprintExportTests
 
         BlueprintFile blueprint = ParseBlueprint(json);
 
-    int ammoIntakeId = GameData.Blocks["AmmoIntake_1"].BlockId;
-    Assert.Equal(7, blueprint.Blueprint.BlockIds.Count);
-    Assert.Equal(2, blueprint.Blueprint.BlockIds.Count(blockId => blockId == ammoIntakeId));
+        int ammoIntakeId = GameData.Blocks["AmmoIntake_1"].BlockId;
+        Assert.Equal(7, blueprint.Blueprint.BlockIds.Count);
+        Assert.Equal(2, blueprint.Blueprint.BlockIds.Count(blockId => blockId == ammoIntakeId));
 
         int ejectorId = GameData.Blocks["Ejector_1"].BlockId;
-        int expectedRotation = GameData.Blocks["Ejector_1"].RotationMap[LogicalOrientation.West];
-        int oppositeRotation = GameData.Blocks["Ejector_1"].RotationMap[LogicalOrientation.East];
+        int expectedRotation = BlockRotation.FindRotation(Vector3.UnitZ, -Vector3.UnitX, Vector3.UnitY, -Vector3.UnitY);
+        int oppositeRotation = BlockRotation.FindRotation(Vector3.UnitZ, Vector3.UnitX, Vector3.UnitY, -Vector3.UnitY);
         int ejectorIndex = blueprint.Blueprint.BlockIds.FindIndex(blockId => blockId == ejectorId);
 
         Assert.NotEqual(-1, ejectorIndex);
@@ -269,6 +269,7 @@ public sealed class BlueprintExportTests
         var blockById = GameData.Blocks.Values
             .GroupBy(definition => definition.BlockId)
             .ToDictionary(group => group.Key, group => group.First());
+        int ammoIntakeBlockId = GameData.Blocks["AmmoIntake_1"].BlockId;
 
         int cursor = 0;
 
@@ -276,21 +277,13 @@ public sealed class BlueprintExportTests
         {
             int blockId = blueprint.Blueprint.BlockIds[sortedIndex];
             int rotationCode = blueprint.Blueprint.BLR[sortedIndex];
-            BasicBlockDefinition definition = blockById[blockId];
+            BlockDefinition definition = blockById[blockId];
             string rawBlockData = definition.DefaultBlockData;
 
-            if (definition.BlockDataMap is not null)
+            if (blockId == ammoIntakeBlockId)
             {
-                foreach (KeyValuePair<LogicalOrientation, int> rotationEntry in definition.RotationMap)
-                {
-                    if (rotationEntry.Value != rotationCode)
-                        continue;
-
-                    if (definition.BlockDataMap.TryGetValue(rotationEntry.Key, out string? mappedBlockData))
-                        rawBlockData = mappedBlockData;
-
-                    break;
-                }
+                Vector3 direction = BlockRotation.TransformDirection(rotationCode, Vector3.UnitZ);
+                rawBlockData = GameData.GetAmmoIntakeBlockData(direction);
             }
 
             if (string.IsNullOrEmpty(rawBlockData))
@@ -331,34 +324,5 @@ public sealed class BlueprintExportTests
             int.Parse(parts[0], CultureInfo.InvariantCulture),
             int.Parse(parts[1], CultureInfo.InvariantCulture),
             int.Parse(parts[2], CultureInfo.InvariantCulture));
-    }
-
-    private static LogicalOrientation ToHorizontalOrientation(int deltaRow, int deltaCol)
-    {
-        if (deltaRow == -1 && deltaCol == 0)
-            return LogicalOrientation.North;
-
-        if (deltaRow == 1 && deltaCol == 0)
-            return LogicalOrientation.South;
-
-        if (deltaRow == 0 && deltaCol == 1)
-            return LogicalOrientation.East;
-
-        if (deltaRow == 0 && deltaCol == -1)
-            return LogicalOrientation.West;
-
-        throw new InvalidOperationException($"Unsupported directional delta ({deltaRow}, {deltaCol}).");
-    }
-
-    private static LogicalOrientation OppositeHorizontalOrientation(LogicalOrientation orientation)
-    {
-        return orientation switch
-        {
-            LogicalOrientation.North => LogicalOrientation.South,
-            LogicalOrientation.South => LogicalOrientation.North,
-            LogicalOrientation.East => LogicalOrientation.West,
-            LogicalOrientation.West => LogicalOrientation.East,
-            _ => throw new InvalidOperationException($"Unsupported horizontal orientation '{orientation}'.")
-        };
     }
 }
