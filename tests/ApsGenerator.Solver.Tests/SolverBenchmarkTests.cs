@@ -5,11 +5,15 @@ using Xunit.Abstractions;
 
 namespace ApsGenerator.Solver.Tests;
 
-public sealed class SolverBenchmarkTests
+/// <summary>
+/// Benchmarks for the TetrisSolver to track performance regressions over time.
+/// All benchmarks have a time limit of about double the expected solve time.
+/// Expected cluster counts and solution counts are based on historical runs. 
+/// Any change that causes any benchmark to exceed its time limit or produce different results is a critical regression.
+/// </summary>
+public sealed class SolverBenchmarkTests(ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public SolverBenchmarkTests(ITestOutputHelper output) => _output = output;
+    private readonly ITestOutputHelper _output = output;
 
     [Fact]
     [Trait("Category", "RegressionBenchmark")]
@@ -24,7 +28,7 @@ public sealed class SolverBenchmarkTests
             SymmetryMode = SymmetryMode.Hard,
             EarlyStopEnabled = false
         };
-        RunBenchmark(grid, TetrisType.ThreeClip, options, "45x45_3Clip_BothReflection");
+        RunBenchmark(grid, TetrisType.ThreeClip, options, 398, 10, "45x45_3Clip_BothReflection");
     }
 
     [Fact]
@@ -34,13 +38,13 @@ public sealed class SolverBenchmarkTests
         var grid = TemplateGenerator.Circle(33, blockCenter: true);
         var options = new SolverOptions
         {
-            MaxTimeSeconds = 15,
-            NumSolutions = 10,
+            MaxTimeSeconds = 24,
+            NumSolutions = 50,
             SymmetryType = SymmetryType.VerticalReflection,
             SymmetryMode = SymmetryMode.Hard,
             EarlyStopEnabled = false
         };
-        RunBenchmark(grid, TetrisType.ThreeClip, options, "33x33_3Clip_VerticalReflection");
+        RunBenchmark(grid, TetrisType.ThreeClip, options, 214, 50, "33x33_3Clip_VerticalReflection");
     }
 
     [Fact]
@@ -50,12 +54,12 @@ public sealed class SolverBenchmarkTests
         var grid = TemplateGenerator.Circle(29, blockCenter: true);
         var options = new SolverOptions
         {
-            MaxTimeSeconds = 20,
+            MaxTimeSeconds = 6,
             NumSolutions = 10,
             SymmetryType = SymmetryType.None,
             EarlyStopEnabled = false
         };
-        RunBenchmark(grid, TetrisType.ThreeClip, options, "29x29_3Clip_NoSymmetry");
+        RunBenchmark(grid, TetrisType.ThreeClip, options, 166, 10, "29x29_3Clip_NoSymmetry");
     }
 
     [Fact]
@@ -65,13 +69,13 @@ public sealed class SolverBenchmarkTests
         var grid = TemplateGenerator.Circle(25, blockCenter: true);
         var options = new SolverOptions
         {
-            MaxTimeSeconds = 20,
+            MaxTimeSeconds = 14,
             NumSolutions = 10,
             SymmetryType = SymmetryType.Rotation180,
             SymmetryMode = SymmetryMode.Hard,
             EarlyStopEnabled = false
         };
-        RunBenchmark(grid, TetrisType.FourClip, options, "25x25_4Clip_Rotation180");
+        RunBenchmark(grid, TetrisType.FourClip, options, 88, 8, "25x25_4Clip_Rotation180");
     }
 
     [Fact]
@@ -81,13 +85,13 @@ public sealed class SolverBenchmarkTests
         var grid = TemplateGenerator.Circle(25, blockCenter: true);
         var options = new SolverOptions
         {
-            MaxTimeSeconds = 20,
+            MaxTimeSeconds = 2,
             NumSolutions = 10,
             SymmetryType = SymmetryType.Rotation90,
             SymmetryMode = SymmetryMode.Hard,
             EarlyStopEnabled = false
         };
-        RunBenchmark(grid, TetrisType.FourClip, options, "25x25_4Clip_Rotation90");
+        RunBenchmark(grid, TetrisType.FourClip, options, 88, 4, "25x25_4Clip_Rotation90");
     }
 
     [Fact]
@@ -97,13 +101,13 @@ public sealed class SolverBenchmarkTests
         var grid = TemplateGenerator.Circle(25, blockCenter: true);
         var options = new SolverOptions
         {
-            MaxTimeSeconds = 20,
+            MaxTimeSeconds = 10,
             NumSolutions = 10,
             SymmetryType = SymmetryType.VerticalReflection,
             SymmetryMode = SymmetryMode.Hard,
             EarlyStopEnabled = false
         };
-        RunBenchmark(grid, TetrisType.FourClip, options, "25x25_4Clip_VerticalReflection");
+        RunBenchmark(grid, TetrisType.FourClip, options, 84, 10, "25x25_4Clip_VerticalReflection");
     }
 
     [Fact]
@@ -114,24 +118,59 @@ public sealed class SolverBenchmarkTests
         grid[10, 10] = CellState.Blocked;
         var options = new SolverOptions
         {
-            MaxTimeSeconds = 15,
+            MaxTimeSeconds = 8,
             NumSolutions = 10,
             SymmetryType = SymmetryType.VerticalReflection,
             SymmetryMode = SymmetryMode.Hard,
             EarlyStopEnabled = false
         };
-        RunBenchmark(grid, TetrisType.ThreeClip, options, "21x21Rect_3Clip_VerticalReflection");
+        RunBenchmark(grid, TetrisType.ThreeClip, options, 109, 2, "21x21Rect_3Clip_VerticalReflection");
     }
 
-    private void RunBenchmark(Grid grid, TetrisType type, SolverOptions options, string label)
+    [Fact]
+    [Trait("Category", "RegressionBenchmark")]
+    public void Benchmark_21x21Rect_3Clip_VerticalReflectionCenterLine()
+    {
+        var grid = TemplateGenerator.Rectangle(20, 21);
+        var options = new SolverOptions
+        {
+            MaxTimeSeconds = 2,
+            NumSolutions = 50,
+            SymmetryType = SymmetryType.VerticalReflection,
+            SymmetryMode = SymmetryMode.Hard,
+            EarlyStopEnabled = false,
+        };
+        RunBenchmark(grid, TetrisType.ThreeClip, options, 104, 50, "21x21Rect_3Clip_VerticalReflectionCenterLine");
+    }
+
+    [Fact]
+    [Trait("Category", "RegressionBenchmark")]
+    public void Benchmark_17x17Rect_5Clip_VerticalReflection()
+    {
+        var grid = TemplateGenerator.Circle(17, blockCenter: false);
+        var options = new SolverOptions
+        {
+            MaxTimeSeconds = 24,
+            NumSolutions = 10,
+            SymmetryType = SymmetryType.VerticalReflection,
+            SymmetryMode = SymmetryMode.Hard,
+            EarlyStopEnabled = false
+        };
+        RunBenchmark(grid, TetrisType.FiveClip, options, 42, 10, "17x17Circle_5Clip_VerticalReflection");
+    }
+
+    private void RunBenchmark(Grid grid, TetrisType type, SolverOptions options, int expectedClusterCount, int expectedNumSolutions, string label)
     {
         var solver = new TetrisSolver();
         var sw = Stopwatch.StartNew();
-        var result = solver.Solve(grid, type, options);
+        CancellationTokenSource cts = new(TimeSpan.FromSeconds(options.MaxTimeSeconds + 1)); // Ensure solver respects MaxTimeSeconds
+        var result = solver.Solve(grid, type, options, cts.Token);
         sw.Stop();
 
         _output.WriteLine($"[{label}] Time: {sw.ElapsedMilliseconds}ms, Solutions: {result.AllSolutions.Count}, Clusters: {result.ClusterCount}, Status: {result.Status}");
 
-        Assert.True(result.AllSolutions.Count > 0, $"[{label}] No solutions found");
+        Assert.Equal(SolverStatus.Optimal, result.Status);
+        Assert.Equal(expectedClusterCount, result.ClusterCount);
+        Assert.Equal(expectedNumSolutions, result.AllSolutions.Count);
     }
 }
