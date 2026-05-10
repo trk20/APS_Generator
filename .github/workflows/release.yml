@@ -173,7 +173,7 @@ jobs:
           --tag v${{ inputs.version }}
           --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}"
           --publish
-          ${{ inputs.experimental && '--prerelease' || '' }}
+          ${{ inputs.experimental && '--pre' || '' }}
           --token ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Windows Release
@@ -184,5 +184,6 @@ jobs:
           --tag v${{ inputs.version }}
           --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}"
           --publish
-          ${{ inputs.experimental && '--prerelease' || '' }}
+          --merge
+          ${{ inputs.experimental && '--pre' || '' }}
           --token ${{ secrets.GITHUB_TOKEN }}
