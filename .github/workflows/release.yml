@@ -30,7 +30,7 @@ jobs:
           dotnet-quality: "ga"
 
       - name: Run tests
-        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=Slow'
+        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=RegressionBenchmark&Category!=Slow'
 
       # Linux native lib (libcryptominisat5.so) is already in runtimes/linux-x64/native/
       - name: Publish
@@ -114,7 +114,7 @@ jobs:
         shell: pwsh
         env:
           PATH: ${{ github.workspace }}\src\ApsGenerator.Solver\runtimes\win-x64\native;${{ env.PATH }}
-        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=Slow'
+        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=RegressionBenchmark&Category!=Slow'
 
       - name: Publish
         run: >
