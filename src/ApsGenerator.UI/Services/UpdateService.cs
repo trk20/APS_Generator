@@ -6,7 +6,7 @@ namespace ApsGenerator.UI.Services;
 
 public static class UpdateService
 {
-    private const string RepoUrl = "https://github.com/trk20/APS-Generator";
+    private const string RepoUrl = "https://github.com/trk20/APS_Generator";
 
     public static UpdateManager CreateUpdateManager(bool receiveExperimental)
     {

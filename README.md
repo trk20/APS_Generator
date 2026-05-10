@@ -54,6 +54,12 @@ Releases are **self-contained** - no .NET runtime installation required. After i
    chmod +x APS-Generator.AppImage && ./APS-Generator.AppImage
    ```
 
+> **Arch or Arch-based distros (CachyOS, SteamOS, Manjaro, EndeavourOS, etc.):** AppImage requires FUSE2. Install it with:
+>
+> ```bash
+> sudo pacman -S fuse2
+> ```
+
 #### Updates
 
 The app checks for updates automatically on startup. You can configure update behavior in **Settings → Application**:
