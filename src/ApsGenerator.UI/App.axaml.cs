@@ -39,23 +39,42 @@ public partial class App : Application
             var targetVersion = updateInfo.TargetFullRelease.Version.ToString();
             var releaseNotes = updateInfo.TargetFullRelease.NotesMarkdown ?? "";
 
-            if (!vm.AutoUpdate)
-            {
-                vm.UpdateAvailable = true;
-                vm.UpdateVersionText = $"Update available: v{targetVersion}";
-                return;
-            }
+            vm.UpdateAvailable = true;
+            vm.UpdateVersionText = $"v{targetVersion}";
+            vm.UpdateReleaseNotes = releaseNotes;
 
-            if (vm.ShowReleaseNotesAfterUpdate)
+            vm.ShowPendingReleaseNotes = async () =>
             {
-                var dialog = new ReleaseNotesDialog(targetVersion, releaseNotes, showUpdate: true);
-                var shouldUpdate = await dialog.ShowDialog<bool>(owner);
-                if (!shouldUpdate)
+                var dialog = new ReleaseNotesDialog(targetVersion, releaseNotes, showUpdate: false);
+                await dialog.ShowDialog(owner);
+            };
+
+            vm.ApplyPendingUpdate = async () =>
+            {
+                await mgr.DownloadUpdatesAsync(updateInfo);
+                mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
+            };
+
+            if (vm.AutoUpdate)
+            {
+                if (vm.ShowReleaseNotesAfterUpdate)
+                {
+                    var dialog = new ReleaseNotesDialog(targetVersion, releaseNotes, showUpdate: true);
+                    var shouldUpdate = await dialog.ShowDialog<bool>(owner);
+                    if (shouldUpdate)
+                    {
+                        await mgr.DownloadUpdatesAsync(updateInfo);
+                        mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
+                        return;
+                    }
+                }
+                else
+                {
+                    await mgr.DownloadUpdatesAsync(updateInfo);
+                    mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
                     return;
+                }
             }
-
-            await mgr.DownloadUpdatesAsync(updateInfo);
-            mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
         }
         catch (Exception ex)
         {

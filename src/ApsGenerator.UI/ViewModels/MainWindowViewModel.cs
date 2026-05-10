@@ -70,6 +70,9 @@ public partial class MainWindowViewModel : ObservableObject
     private string updateVersionText = "";
 
     [ObservableProperty]
+    private string updateReleaseNotes = "";
+
+    [ObservableProperty]
     private bool earlyStopEnabled = true;
 
     [ObservableProperty]
@@ -159,6 +162,10 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<string, Task<bool>>? ConfirmAsync { get; set; }
 
     public Func<Task>? ShowExportDialogAsync { get; set; }
+
+    public Func<Task>? ShowPendingReleaseNotes { get; set; }
+
+    public Func<Task>? ApplyPendingUpdate { get; set; }
 
     public Action<double>? ScaleChanged { get; set; }
 

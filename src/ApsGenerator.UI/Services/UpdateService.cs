@@ -23,6 +23,10 @@ public static class UpdateService
     {
         var asm = typeof(UpdateService).Assembly;
         var version = asm.GetName().Version;
-        return version is null ? null : $"{version.Major}.{version.Minor}.{version.Build}";
+        if (version is null)
+            return null;
+
+        var str = $"{version.Major}.{version.Minor}.{version.Build}";
+        return str == "1.0.0" ? "dev" : str;
     }
 }

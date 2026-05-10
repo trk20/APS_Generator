@@ -97,15 +97,19 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public void GetCurrentVersion_ReturnsMajorMinorBuildFormat()
+    public void GetCurrentVersion_ReturnsDevForDefaultVersion_ElseMajorMinorBuildFormat()
     {
         var version = UpdateService.GetCurrentVersion();
 
         Assert.NotNull(version);
-        Assert.Matches("^\\d+\\.\\d+\\.\\d+$", version!);
 
         var asmVersion = typeof(UpdateService).Assembly.GetName().Version!;
         var expected = $"{asmVersion.Major}.{asmVersion.Minor}.{asmVersion.Build}";
+        if (expected == "1.0.0")
+        {
+            expected = "dev";
+        }
+
         Assert.Equal(expected, version);
     }
 

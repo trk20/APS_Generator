@@ -7,6 +7,11 @@ on:
         description: "Release version (e.g. 1.0.0)"
         required: true
         type: string
+      release_notes:
+        description: "Release notes (markdown)"
+        required: false
+        type: string
+        default: ""
       experimental:
         description: "Mark as experimental/prerelease"
         required: false
@@ -44,6 +49,12 @@ jobs:
       - name: Install vpk
         run: dotnet tool install -g vpk
 
+      - name: Write release notes
+        shell: bash
+        env:
+          NOTES: ${{ inputs.release_notes }}
+        run: printf '%s' "$NOTES" > release-notes.md
+
       - name: Package
         run: >
           vpk pack
@@ -51,6 +62,7 @@ jobs:
           --packVersion ${{ inputs.version }}
           --packDir src/ApsGenerator.UI/bin/Release/net10.0/linux-x64/publish
           --mainExe ApsGenerator.UI
+          --releaseNotes release-notes.md
           --outputDir releases
 
       - uses: actions/upload-artifact@v4
@@ -127,6 +139,12 @@ jobs:
       - name: Install vpk
         run: dotnet tool install -g vpk
 
+      - name: Write release notes
+        shell: bash
+        env:
+          NOTES: ${{ inputs.release_notes }}
+        run: printf '%s' "$NOTES" > release-notes.md
+
       - name: Package
         run: >
           vpk pack
@@ -134,6 +152,7 @@ jobs:
           --packVersion ${{ inputs.version }}
           --packDir src/ApsGenerator.UI/bin/Release/net10.0/win-x64/publish
           --mainExe ApsGenerator.UI.exe
+          --releaseNotes release-notes.md
           --outputDir releases
 
       - uses: actions/upload-artifact@v4
