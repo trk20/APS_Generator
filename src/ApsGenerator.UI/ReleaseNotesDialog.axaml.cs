@@ -17,7 +17,7 @@ public partial class ReleaseNotesDialog : Window
     {
         InitializeComponent();
         VersionHeader.Text = $"Version {version}";
-        ReleaseNotesText.Text = string.IsNullOrWhiteSpace(releaseNotes)
+        ReleaseNotesContent.Markdown = string.IsNullOrWhiteSpace(releaseNotes)
             ? "No release notes available."
             : releaseNotes;
         UpdateButton.IsVisible = showUpdate;
