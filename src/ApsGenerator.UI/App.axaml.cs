@@ -31,6 +31,23 @@ public partial class App : Application
     {
         try
         {
+            var settings = UserSettingsStore.Load();
+            if (vm.ShowReleaseNotesAfterUpdate
+                && !string.IsNullOrEmpty(settings.PendingReleaseNotesVersion))
+            {
+                var dialog = new ReleaseNotesDialog(
+                    settings.PendingReleaseNotesVersion,
+                    settings.PendingReleaseNotesContent ?? "",
+                    showUpdate: false);
+                await dialog.ShowDialog(owner);
+
+                settings.PendingReleaseNotesVersion = null;
+                settings.PendingReleaseNotesContent = null;
+                vm.PendingReleaseNotesVersion = null;
+                vm.PendingReleaseNotesContent = null;
+                UserSettingsStore.Save(settings);
+            }
+
             var mgr = UpdateService.CreateUpdateManager(vm.ReceiveExperimentalUpdates);
             var updateInfo = await mgr.CheckForUpdatesAsync();
             if (updateInfo is null)
@@ -38,6 +55,13 @@ public partial class App : Application
 
             var targetVersion = updateInfo.TargetFullRelease.Version.ToString();
             var releaseNotes = updateInfo.TargetFullRelease.NotesMarkdown ?? "";
+
+            void SavePendingReleaseNotes()
+            {
+                vm.PendingReleaseNotesVersion = targetVersion;
+                vm.PendingReleaseNotesContent = releaseNotes;
+                UserSettingsStore.Save(vm.CreateUserSettings());
+            }
 
             vm.UpdateAvailable = true;
             vm.UpdateVersionText = $"v{targetVersion}";
@@ -51,29 +75,16 @@ public partial class App : Application
 
             vm.ApplyPendingUpdate = async () =>
             {
+                SavePendingReleaseNotes();
                 await mgr.DownloadUpdatesAsync(updateInfo);
                 mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
             };
 
             if (vm.AutoUpdate)
             {
-                if (vm.ShowReleaseNotesAfterUpdate)
-                {
-                    var dialog = new ReleaseNotesDialog(targetVersion, releaseNotes, showUpdate: true);
-                    var shouldUpdate = await dialog.ShowDialog<bool>(owner);
-                    if (shouldUpdate)
-                    {
-                        await mgr.DownloadUpdatesAsync(updateInfo);
-                        mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
-                        return;
-                    }
-                }
-                else
-                {
-                    await mgr.DownloadUpdatesAsync(updateInfo);
-                    mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
-                    return;
-                }
+                SavePendingReleaseNotes();
+                await mgr.DownloadUpdatesAsync(updateInfo);
+                mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
             }
         }
         catch (Exception ex)

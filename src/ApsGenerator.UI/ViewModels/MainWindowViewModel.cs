@@ -72,6 +72,10 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string updateReleaseNotes = "";
 
+    public string? PendingReleaseNotesVersion { get; set; }
+
+    public string? PendingReleaseNotesContent { get; set; }
+
     [ObservableProperty]
     private bool earlyStopEnabled = true;
 
@@ -234,7 +238,9 @@ public partial class MainWindowViewModel : ObservableObject
         UiScale = UiScale,
         AutoUpdate = AutoUpdate,
         ReceiveExperimentalUpdates = ReceiveExperimentalUpdates,
-        ShowReleaseNotesAfterUpdate = ShowReleaseNotesAfterUpdate
+        ShowReleaseNotesAfterUpdate = ShowReleaseNotesAfterUpdate,
+        PendingReleaseNotesVersion = PendingReleaseNotesVersion,
+        PendingReleaseNotesContent = PendingReleaseNotesContent
     };
 
     partial void OnDefaultExportHeightFiveClipChanged(int value)
@@ -295,6 +301,8 @@ public partial class MainWindowViewModel : ObservableObject
         AutoUpdate = settings.AutoUpdate;
         ReceiveExperimentalUpdates = settings.ReceiveExperimentalUpdates;
         ShowReleaseNotesAfterUpdate = settings.ShowReleaseNotesAfterUpdate;
+        PendingReleaseNotesVersion = settings.PendingReleaseNotesVersion;
+        PendingReleaseNotesContent = settings.PendingReleaseNotesContent;
 
         TargetPlacementCount = settings.TargetPlacementCount >= 0
             ? settings.TargetPlacementCount

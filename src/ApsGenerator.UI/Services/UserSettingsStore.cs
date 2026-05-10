@@ -83,7 +83,9 @@ public static class UserSettingsStore
             UiScale = ReadDouble(root, nameof(UserSettings.UiScale), defaults.UiScale),
             AutoUpdate = ReadBool(root, nameof(UserSettings.AutoUpdate), defaults.AutoUpdate),
             ReceiveExperimentalUpdates = ReadBool(root, nameof(UserSettings.ReceiveExperimentalUpdates), defaults.ReceiveExperimentalUpdates),
-            ShowReleaseNotesAfterUpdate = ReadBool(root, nameof(UserSettings.ShowReleaseNotesAfterUpdate), defaults.ShowReleaseNotesAfterUpdate)
+            ShowReleaseNotesAfterUpdate = ReadBool(root, nameof(UserSettings.ShowReleaseNotesAfterUpdate), defaults.ShowReleaseNotesAfterUpdate),
+            PendingReleaseNotesVersion = ReadString(root, nameof(UserSettings.PendingReleaseNotesVersion)),
+            PendingReleaseNotesContent = ReadString(root, nameof(UserSettings.PendingReleaseNotesContent))
         };
     }
 

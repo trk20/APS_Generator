@@ -78,6 +78,11 @@ public partial class SettingsDialog : Window
             if (shouldUpdate)
             {
                 CheckForUpdatesButton.Content = "Downloading...";
+
+                viewModel.PendingReleaseNotesVersion = targetVersion;
+                viewModel.PendingReleaseNotesContent = releaseNotes;
+                UserSettingsStore.Save(viewModel.CreateUserSettings());
+
                 await mgr.DownloadUpdatesAsync(updateInfo);
                 mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
             }

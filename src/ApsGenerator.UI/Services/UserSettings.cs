@@ -56,4 +56,8 @@ public sealed class UserSettings
     public bool ReceiveExperimentalUpdates { get; set; } = false;
 
     public bool ShowReleaseNotesAfterUpdate { get; set; } = true;
+
+    public string? PendingReleaseNotesVersion { get; set; }
+
+    public string? PendingReleaseNotesContent { get; set; }
 }
