@@ -80,7 +80,10 @@ public static class UserSettingsStore
             DefaultExportHeightFiveClip = ReadInt(root, nameof(UserSettings.DefaultExportHeightFiveClip), defaults.DefaultExportHeightFiveClip),
             ExportNameTemplate = ReadString(root, nameof(UserSettings.ExportNameTemplate)) ?? defaults.ExportNameTemplate,
             NumSolutions = ReadInt(root, nameof(UserSettings.NumSolutions), defaults.NumSolutions),
-            UiScale = ReadDouble(root, nameof(UserSettings.UiScale), defaults.UiScale)
+            UiScale = ReadDouble(root, nameof(UserSettings.UiScale), defaults.UiScale),
+            AutoUpdate = ReadBool(root, nameof(UserSettings.AutoUpdate), defaults.AutoUpdate),
+            ReceiveExperimentalUpdates = ReadBool(root, nameof(UserSettings.ReceiveExperimentalUpdates), defaults.ReceiveExperimentalUpdates),
+            ShowReleaseNotesAfterUpdate = ReadBool(root, nameof(UserSettings.ShowReleaseNotesAfterUpdate), defaults.ShowReleaseNotesAfterUpdate)
         };
     }
 

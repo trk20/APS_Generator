@@ -7,6 +7,11 @@ on:
         description: "Release version (e.g. 1.0.0)"
         required: true
         type: string
+      experimental:
+        description: "Mark as experimental/prerelease"
+        required: false
+        type: boolean
+        default: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -34,18 +39,24 @@ jobs:
           -c Release
           -r linux-x64
           --self-contained
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:Version=${{ inputs.version }}
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk
 
       - name: Package
-        run: |
-          cd src/ApsGenerator.UI/bin/Release/net10.0/linux-x64/publish
-          zip -r "$GITHUB_WORKSPACE/APS-Generator-${{ inputs.version }}-linux-x64.zip" .
+        run: >
+          vpk pack
+          --packId APS-Generator
+          --packVersion ${{ inputs.version }}
+          --packDir src/ApsGenerator.UI/bin/Release/net10.0/linux-x64/publish
+          --mainExe ApsGenerator.UI
+          --outputDir releases
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64
-          path: APS-Generator-${{ inputs.version }}-linux-x64.zip
+          path: releases/
 
   build-windows:
     runs-on: windows-latest
@@ -111,20 +122,24 @@ jobs:
           -c Release
           -r win-x64
           --self-contained
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:Version=${{ inputs.version }}
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk
 
       - name: Package
-        shell: pwsh
-        run: |
-          Compress-Archive `
-            -Path "src/ApsGenerator.UI/bin/Release/net10.0/win-x64/publish/*" `
-            -DestinationPath "APS-Generator-${{ inputs.version }}-windows-x64.zip"
+        run: >
+          vpk pack
+          --packId APS-Generator
+          --packVersion ${{ inputs.version }}
+          --packDir src/ApsGenerator.UI/bin/Release/net10.0/win-x64/publish
+          --mainExe ApsGenerator.UI.exe
+          --outputDir releases
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: APS-Generator-${{ inputs.version }}-windows-x64.zip
+          path: releases/
 
   release:
     needs: [build-linux, build-windows]
@@ -132,19 +147,42 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+          dotnet-quality: "ga"
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk
+
       - uses: actions/download-artifact@v4
         with:
           name: linux-x64
+          path: releases/linux
 
       - uses: actions/download-artifact@v4
         with:
           name: windows-x64
+          path: releases/windows
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ inputs.version }}
-          name: v${{ inputs.version }}
-          files: |
-            APS-Generator-${{ inputs.version }}-linux-x64.zip
-            APS-Generator-${{ inputs.version }}-windows-x64.zip
+      - name: Upload Linux Release
+        run: >
+          vpk upload github
+          --repoUrl https://github.com/${{ github.repository }}
+          --outputDir releases/linux
+          --tag v${{ inputs.version }}
+          --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}"
+          --publish
+          ${{ inputs.experimental && '--prerelease' || '' }}
+          --token ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows Release
+        run: >
+          vpk upload github
+          --repoUrl https://github.com/${{ github.repository }}
+          --outputDir releases/windows
+          --tag v${{ inputs.version }}
+          --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}"
+          --publish
+          ${{ inputs.experimental && '--prerelease' || '' }}
+          --token ${{ secrets.GITHUB_TOKEN }}

@@ -50,4 +50,10 @@ public sealed class UserSettings
     public int NumSolutions { get; set; } = 1;
 
     public double UiScale { get; set; } = 1.0;
+
+    public bool AutoUpdate { get; set; } = true;
+
+    public bool ReceiveExperimentalUpdates { get; set; } = false;
+
+    public bool ShowReleaseNotesAfterUpdate { get; set; } = true;
 }

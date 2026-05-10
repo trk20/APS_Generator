@@ -40,6 +40,15 @@ public partial class MainWindow : Window
         await dialog.ShowDialog(this);
     }
 
+    private async void OnUpdateNotificationClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm)
+            return;
+
+        var dialog = new SettingsDialog(vm);
+        await dialog.ShowDialog(this);
+    }
+
     private async Task<bool> ShowConfirmationAsync(string message)
     {
         var dialog = new ConfirmationDialog(message);

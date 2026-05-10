@@ -1,3 +1,5 @@
+using System;
+using System.Threading.Tasks;
 using ApsGenerator.UI.Services;
 using ApsGenerator.UI.ViewModels;
 using Avalonia.Controls;
@@ -15,6 +17,7 @@ public partial class SettingsDialog : Window
         InitializeComponent();
         RegisterDialogHandlers();
         viewModel = new MainWindowViewModel();
+        SetVersionLabel();
     }
 
     public SettingsDialog(MainWindowViewModel viewModel)
@@ -23,6 +26,12 @@ public partial class SettingsDialog : Window
         RegisterDialogHandlers();
         this.viewModel = viewModel;
         DataContext = viewModel;
+        SetVersionLabel();
+    }
+
+    private void SetVersionLabel()
+    {
+        VersionLabel.Text = $"Version: {UpdateService.GetCurrentVersion() ?? "dev"}";
     }
 
     private void RegisterDialogHandlers()
@@ -41,6 +50,48 @@ public partial class SettingsDialog : Window
             FiveClipHeight.RoundToMultipleOf3(viewModel.DefaultExportHeightFiveClip);
         UserSettingsStore.Save(viewModel.CreateUserSettings());
         Close();
+    }
+
+    private async void OnCheckForUpdatesClick(object? sender, RoutedEventArgs e)
+    {
+        CheckForUpdatesButton.IsEnabled = false;
+        CheckForUpdatesButton.Content = "Checking...";
+
+        try
+        {
+            var mgr = UpdateService.CreateUpdateManager(viewModel.ReceiveExperimentalUpdates);
+            var updateInfo = await mgr.CheckForUpdatesAsync();
+
+            if (updateInfo is null)
+            {
+                var upToDate = new ConfirmationDialog("You're up to date!", viewModel.UiScale);
+                await upToDate.ShowDialog(this);
+                return;
+            }
+
+            var targetVersion = updateInfo.TargetFullRelease.Version.ToString();
+            var releaseNotes = updateInfo.TargetFullRelease.NotesMarkdown ?? "";
+
+            var dialog = new ReleaseNotesDialog(targetVersion, releaseNotes, showUpdate: true);
+            var shouldUpdate = await dialog.ShowDialog<bool>(this);
+
+            if (shouldUpdate)
+            {
+                CheckForUpdatesButton.Content = "Downloading...";
+                await mgr.DownloadUpdatesAsync(updateInfo);
+                mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
+            }
+        }
+        catch (Exception ex)
+        {
+            var errorDialog = new ConfirmationDialog($"Update check failed: {ex.Message}", viewModel.UiScale);
+            await errorDialog.ShowDialog(this);
+        }
+        finally
+        {
+            CheckForUpdatesButton.IsEnabled = true;
+            CheckForUpdatesButton.Content = "Check for Updates";
+        }
     }
 
     private void OnDefaultExportHeightFiveClipValueChanged(object? sender, NumericUpDownValueChangedEventArgs e)
