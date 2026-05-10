@@ -170,6 +170,7 @@ jobs:
           vpk upload github
           --repoUrl https://github.com/${{ github.repository }}
           --outputDir releases/linux
+          --channel linux
           --tag v${{ inputs.version }}
           --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}"
           --publish
@@ -181,6 +182,7 @@ jobs:
           vpk upload github
           --repoUrl https://github.com/${{ github.repository }}
           --outputDir releases/windows
+          --channel win
           --tag v${{ inputs.version }}
           --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}"
           --publish
