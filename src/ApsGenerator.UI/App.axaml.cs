@@ -21,7 +21,7 @@ public partial class App : Application
             var mainWindow = new MainWindow { DataContext = vm };
             desktop.MainWindow = mainWindow;
 
-            _ = CheckForUpdatesOnStartup(mainWindow, vm);
+            mainWindow.Opened += (_, _) => _ = CheckForUpdatesOnStartup(mainWindow, vm);
         }
 
         base.OnFrameworkInitializationCompleted();
