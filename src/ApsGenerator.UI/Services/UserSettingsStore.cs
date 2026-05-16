@@ -85,7 +85,8 @@ public static class UserSettingsStore
             ReceiveExperimentalUpdates = ReadBool(root, nameof(UserSettings.ReceiveExperimentalUpdates), defaults.ReceiveExperimentalUpdates),
             ShowReleaseNotesAfterUpdate = ReadBool(root, nameof(UserSettings.ShowReleaseNotesAfterUpdate), defaults.ShowReleaseNotesAfterUpdate),
             PendingReleaseNotesVersion = ReadString(root, nameof(UserSettings.PendingReleaseNotesVersion)),
-            PendingReleaseNotesContent = ReadString(root, nameof(UserSettings.PendingReleaseNotesContent))
+            PendingReleaseNotesContent = ReadString(root, nameof(UserSettings.PendingReleaseNotesContent)),
+            LastSeenUpdateVersion = ReadString(root, nameof(UserSettings.LastSeenUpdateVersion))
         };
     }
 

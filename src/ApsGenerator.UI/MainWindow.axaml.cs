@@ -40,31 +40,18 @@ public partial class MainWindow : Window
         await dialog.ShowDialog(this);
     }
 
-    private async void OnShowReleaseNotesClick(object? sender, RoutedEventArgs e)
+    private async void OnUpdateIconClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm || vm.ShowPendingReleaseNotes is null)
             return;
-        await vm.ShowPendingReleaseNotes();
-    }
-
-    private async void OnUpdateAndRestartClick(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel vm || vm.ApplyPendingUpdate is null)
-            return;
-
-        if (sender is Button btn)
-        {
-            btn.IsEnabled = false;
-            btn.Content = "Downloading...";
-        }
 
         try
         {
-            await vm.ApplyPendingUpdate();
+            await vm.ShowPendingReleaseNotes();
         }
         catch (Exception ex)
         {
-            var dialog = new ConfirmationDialog($"Update failed: {ex.Message}");
+            var dialog = new ConfirmationDialog($"Update failed: {ex.Message}", vm.UiScale);
             await dialog.ShowDialog(this);
         }
     }

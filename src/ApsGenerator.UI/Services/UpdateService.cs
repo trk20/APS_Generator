@@ -1,10 +1,11 @@
+using System.Text.RegularExpressions;
 using Velopack;
 using Velopack.Locators;
 using Velopack.Sources;
 
 namespace ApsGenerator.UI.Services;
 
-public static class UpdateService
+public static partial class UpdateService
 {
     private const string RepoUrl = "https://github.com/trk20/APS_Generator";
 
@@ -28,5 +29,22 @@ public static class UpdateService
 
         var str = $"{version.Major}.{version.Minor}.{version.Build}";
         return str == "1.0.0" ? "dev" : str;
+    }
+
+    public static string ProcessReleaseNotes(string? markdown, string version)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+            return string.Empty;
+
+        var filtered = FilterInstallInstructions(markdown);
+        return $"{filtered}\n\n---\n[View this release on GitHub]({RepoUrl}/releases/tag/v{version})";
+    }
+
+    [GeneratedRegex(@"<!--\s*install-start\s*-->[\s\S]*?<!--\s*install-end\s*-->")]
+    private static partial Regex InstallMarkerPattern();
+
+    private static string FilterInstallInstructions(string markdown)
+    {
+        return InstallMarkerPattern().Replace(markdown, string.Empty);
     }
 }

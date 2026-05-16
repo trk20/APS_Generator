@@ -12,7 +12,8 @@ public sealed class UpdateServiceTests
 {
     private const string PackageId = "APS-Generator";
     private const string DefaultChannel = "linux";
-    private const string RepoUrl = "https://github.com/trk20/APS-Generator";
+    private const string RepoUrl = "https://github.com/trk20/APS_Generator";
+    private const string ReleaseTagUrlPrefix = "https://github.com/trk20/APS_Generator/releases/tag/v";
     private const string Sha1 = "0000000000000000000000000000000000000000";
 
     [Fact]
@@ -111,6 +112,62 @@ public sealed class UpdateServiceTests
         }
 
         Assert.Equal(expected, version);
+    }
+
+    [Fact]
+    public void ProcessReleaseNotes_ReturnsEmpty_ForNullInput()
+    {
+        var result = UpdateService.ProcessReleaseNotes(null, "1.2.3");
+
+        Assert.Equal(string.Empty, result);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t")]
+    [InlineData("\r\n")]
+    public void ProcessReleaseNotes_ReturnsEmpty_ForEmptyOrWhitespaceInput(string? markdown)
+    {
+        var result = UpdateService.ProcessReleaseNotes(markdown, "1.2.3");
+
+        Assert.Equal(string.Empty, result);
+    }
+
+    [Fact]
+    public void ProcessReleaseNotes_PreservesMarkdownAndAppendsGithubLink_WhenNoMarkers()
+    {
+        var markdown = "## Highlights\n- Added feature";
+        var version = "2.3.4";
+
+        var result = UpdateService.ProcessReleaseNotes(markdown, version);
+
+        var expected = $"{markdown}\n\n---\n[View this release on GitHub]({ReleaseTagUrlPrefix}{version})";
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void ProcessReleaseNotes_StripsInstallMarkerSectionAndAppendsGithubLink()
+    {
+        var markdown = "## Notes\nIntro\n<!--   install-start   -->\nInstall steps that should be hidden.\n<!-- \tinstall-end\t -->\nOutro";
+        var version = "3.0.0";
+
+        var result = UpdateService.ProcessReleaseNotes(markdown, version);
+
+        var expectedBody = "## Notes\nIntro\n\nOutro";
+        var expected = $"{expectedBody}\n\n---\n[View this release on GitHub]({ReleaseTagUrlPrefix}{version})";
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void ProcessReleaseNotes_UsesProvidedVersionInGithubLink()
+    {
+        var markdown = "Release details";
+        var version = "9.1.0-beta.2";
+
+        var result = UpdateService.ProcessReleaseNotes(markdown, version);
+
+        Assert.Contains($"({ReleaseTagUrlPrefix}{version})", result);
     }
 
     private static TestVelopackLocator CreateLocator(string version, string packagesDir, string channel)

@@ -54,32 +54,21 @@
             <Menu>
                 <MenuItem Header="_Settings" Click="OnSettingsClick" />
             </Menu>
-            <StackPanel Orientation="Horizontal"
-                        IsVisible="{Binding UpdateAvailable}"
-                        HorizontalAlignment="Right"
-                        Margin="0,0,8,0"
-                        Spacing="4">
-                <Button Content="📋 Release Notes"
-                        Click="OnShowReleaseNotesClick"
-                        Padding="8,2"
-                        FontSize="11"
-                        Background="#1565C0"
-                        Foreground="White"
-                        CornerRadius="3"
-                        ToolTip.Tip="View release notes for the available update" />
-                <Button Click="OnUpdateAndRestartClick"
-                        Padding="8,2"
-                        FontSize="11"
-                        Background="#2E7D32"
-                        Foreground="White"
-                        CornerRadius="3"
-                        ToolTip.Tip="Download and install the update, then restart the app">
-                    <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Text="⬇" />
-                        <TextBlock Text="{Binding UpdateVersionText}" />
-                    </StackPanel>
-                </Button>
-            </StackPanel>
+            <Button IsVisible="{Binding UpdateAvailable}"
+                    Click="OnUpdateIconClick"
+                    HorizontalAlignment="Right"
+                    Margin="0,0,8,0"
+                    Padding="8,2"
+                    FontSize="11"
+                    Background="#1565C0"
+                    Foreground="White"
+                    CornerRadius="3"
+                    ToolTip.Tip="Update available — click to view release notes">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="⬇" />
+                    <TextBlock Text="{Binding UpdateVersionText}" />
+                </StackPanel>
+            </Button>
         </DockPanel>
 
         <Grid ColumnDefinitions="320,*">

@@ -70,21 +70,27 @@ public partial class SettingsDialog : Window
             }
 
             var targetVersion = updateInfo.TargetFullRelease.Version.ToString();
-            var releaseNotes = updateInfo.TargetFullRelease.NotesMarkdown ?? "";
+            var rawNotes = updateInfo.TargetFullRelease.NotesMarkdown;
+            var processedNotes = UpdateService.ProcessReleaseNotes(rawNotes, targetVersion);
 
-            var dialog = new ReleaseNotesDialog(targetVersion, releaseNotes, showUpdate: true);
+            var dialog = new ReleaseNotesDialog(targetVersion, processedNotes, showUpdate: true);
             var shouldUpdate = await dialog.ShowDialog<bool>(this);
 
             if (shouldUpdate)
             {
                 CheckForUpdatesButton.Content = "Downloading...";
-
-                viewModel.PendingReleaseNotesVersion = targetVersion;
-                viewModel.PendingReleaseNotesContent = releaseNotes;
-                UserSettingsStore.Save(viewModel.CreateUserSettings());
-
                 await mgr.DownloadUpdatesAsync(updateInfo);
+                viewModel.PendingReleaseNotesVersion = targetVersion;
+                viewModel.PendingReleaseNotesContent = rawNotes;
+                UserSettingsStore.Save(viewModel.CreateUserSettings());
                 mgr.ApplyUpdatesAndRestart(updateInfo.TargetFullRelease);
+            }
+            else
+            {
+                viewModel.UpdateAvailable = true;
+                viewModel.UpdateVersionText = $"v{targetVersion}";
+                viewModel.LastSeenUpdateVersion = targetVersion;
+                UserSettingsStore.Save(viewModel.CreateUserSettings());
             }
         }
         catch (Exception ex)

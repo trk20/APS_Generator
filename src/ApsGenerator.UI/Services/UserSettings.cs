@@ -60,4 +60,6 @@ public sealed class UserSettings
     public string? PendingReleaseNotesVersion { get; set; }
 
     public string? PendingReleaseNotesContent { get; set; }
+
+    public string? LastSeenUpdateVersion { get; set; }
 }
