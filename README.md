@@ -54,16 +54,10 @@ Releases are **self-contained** - no .NET runtime installation required. After i
    chmod +x APS-Generator.AppImage && ./APS-Generator.AppImage
    ```
 
-> **Arch or Arch-based distros (EndeavourOS, Manjaro, SteamOS, etc.):** for now (may be fixed later), the generated AppImage requires FUSE2. Install it with:
+> **Modern Linux distributions (Arch, Ubuntu, Debian, etc.):** for now (may be fixed later), the generated AppImage requires FUSE2. Install it with:
 >
 > ```bash
 > sudo pacman -S fuse2
-> ```
->
-> **CachyOS**: The default custom sudoers configuration interferes with FUSE2 - use the following command to allow installation:
->
-> ```bash
-> env -u TERMINFO sudo pacman -S fuse2
 > ```
 
 #### Updates
