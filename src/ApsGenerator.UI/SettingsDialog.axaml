@@ -14,66 +14,88 @@
         </LayoutTransformControl.LayoutTransform>
     <StackPanel Margin="24" Spacing="12" Width="520" Focusable="True" x:Name="RootPanel">
 
-        <TextBlock Text="Thread Count" />
-        <Grid ColumnDefinitions="*,Auto" ToolTip.Tip="Number of CPU threads for the solver.">
-            <Slider Grid.Column="0"
-                Value="{Binding ThreadCount}"
-                Minimum="1" Maximum="{Binding MaxThreadCount}"
-                TickFrequency="1"
-                IsSnapToTickEnabled="True" />
-            <TextBlock Grid.Column="1" Text="{Binding ThreadCount, StringFormat='{}{0:0}'}"
-                       VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="20" />
-        </Grid>
+        <TabControl>
+            <TabItem Header="Solver">
+                <StackPanel Spacing="12" Margin="0,12,0,0">
+                    <TextBlock Text="Thread Count" />
+                    <Grid ColumnDefinitions="*,Auto" ToolTip.Tip="Number of CPU threads for the solver.">
+                        <Slider Grid.Column="0"
+                            Value="{Binding ThreadCount}"
+                            Minimum="1" Maximum="{Binding MaxThreadCount}"
+                            TickFrequency="1"
+                            IsSnapToTickEnabled="True" />
+                        <TextBlock Grid.Column="1" Text="{Binding ThreadCount, StringFormat='{}{0:0}'}"
+                                   VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="20" />
+                    </Grid>
 
-        <TextBlock Text="Max Time (seconds)"
-                   ToolTip.Tip="Maximum wall-clock time for the solver." />
-        <NumericUpDown Value="{Binding MaxTimeSeconds}"
-                       Minimum="1" Maximum="600" Increment="5"
-                       FormatString="0.#"
-                       ToolTip.Tip="Maximum wall-clock time for the solver. The solver will stop and return the best result found so far." />
+                    <TextBlock Text="Max Time (seconds)"
+                               ToolTip.Tip="Maximum wall-clock time for the solver." />
+                    <NumericUpDown Value="{Binding MaxTimeSeconds}"
+                                   Minimum="1" Maximum="600" Increment="5"
+                                   FormatString="0.#"
+                                   ToolTip.Tip="Maximum wall-clock time for the solver. The solver will stop and return the best result found so far." />
 
-        <CheckBox Content="Early Stop Heuristic [Experimental]"
-                  IsChecked="{Binding EarlyStopEnabled}"
-                  ToolTip.Tip="Uses progressive patience to predict when further optimization is unlikely to succeed. Reduces total solve time by ~43% on average, with ~5% chance of stopping one step before the true optimum." />
+                    <CheckBox Content="Early Stop Heuristic [Experimental]"
+                              IsChecked="{Binding EarlyStopEnabled}"
+                              ToolTip.Tip="Uses progressive patience to predict when further optimization is unlikely to succeed. Reduces total solve time by ~43% on average, with ~5% chance of stopping one step before the true optimum." />
 
-        <TextBlock Text="Number of Solutions" />
-        <NumericUpDown Value="{Binding NumSolutions}"
-                       Minimum="1" Maximum="50" Increment="1"
-                       FormatString="0"
-                       ToolTip.Tip="Enumerates multiple distinct optimal layouts. Time budget is shared — larger values may not complete all enumerations." />
+                    <TextBlock Text="Number of Solutions" />
+                    <NumericUpDown Value="{Binding NumSolutions}"
+                                   Minimum="1" Maximum="50" Increment="1"
+                                   FormatString="0"
+                                   ToolTip.Tip="Enumerates multiple distinct optimal layouts. Time budget is shared — larger values may not complete all enumerations." />
 
-        <Separator />
+                    <Separator />
 
-        <TextBlock Text="Default Export Clip/Loader Length (3/4-clip)" />
-        <NumericUpDown Value="{Binding DefaultExportHeightBasic}"
-                       Minimum="1" Maximum="8" Increment="1"
-                       FormatString="0" />
+                    <TextBlock Text="Default Export Clip/Loader Length (3/4-clip)" />
+                    <NumericUpDown Value="{Binding DefaultExportHeightBasic}"
+                                   Minimum="1" Maximum="8" Increment="1"
+                                   FormatString="0" />
 
-        <TextBlock Text="Default Export Stack Height (5-clip)" />
-        <NumericUpDown x:Name="DefaultExportHeightFiveClipBox"
-                   Value="{Binding DefaultExportHeightFiveClip}"
-                       Minimum="3" Maximum="24" Increment="3"
-                   FormatString="0"
-                   ValueChanged="OnDefaultExportHeightFiveClipValueChanged" />
+                    <TextBlock Text="Default Export Stack Height (5-clip)" />
+                    <NumericUpDown x:Name="DefaultExportHeightFiveClipBox"
+                               Value="{Binding DefaultExportHeightFiveClip}"
+                                   Minimum="3" Maximum="24" Increment="3"
+                               FormatString="0"
+                               ValueChanged="OnDefaultExportHeightFiveClipValueChanged" />
 
-        <TextBlock Text="Export Name Template" />
-        <TextBox Text="{Binding ExportNameTemplate}" />
-        <TextBlock Text="Tokens: {width}, {height}, {clips}, {count}, {targetHeight}"
-                   FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
+                    <TextBlock Text="Export Name Template" />
+                    <TextBox Text="{Binding ExportNameTemplate}" />
+                    <TextBlock Text="Tokens: {width}, {height}, {clips}, {count}, {targetHeight}"
+                               FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
+                </StackPanel>
+            </TabItem>
 
-        <Separator />
+            <TabItem Header="Application">
+                <StackPanel Spacing="12" Margin="0,12,0,0">
+                    <TextBlock Text="UI Scale"
+                               ToolTip.Tip="Scale multiplier for UI elements. Increase for high-DPI displays." />
+                    <NumericUpDown Value="{Binding UiScale}"
+                                   Minimum="0.5" Maximum="4" Increment="0.1"
+                                   FormatString="0.##"
+                                   ToolTip.Tip="Scale multiplier for UI elements. Increase for high-DPI displays." />
 
-        <TextBlock Text="UI Scale"
-                   ToolTip.Tip="Scale multiplier for UI elements. Increase for high-DPI displays." />
-        <NumericUpDown Value="{Binding UiScale}"
-                       Minimum="0.5" Maximum="4" Increment="0.1"
-                       FormatString="0.##"
-                       ToolTip.Tip="Scale multiplier for UI elements. Increase for high-DPI displays." />
+                    <Separator />
 
+                    <CheckBox Content="Auto Update"
+                              IsChecked="{Binding AutoUpdate}" />
+                    <CheckBox Content="Receive experimental updates"
+                              IsChecked="{Binding ReceiveExperimentalUpdates}"
+                              ToolTip.Tip="Include prerelease versions. These may be unstable." />
+                    <CheckBox Content="Show release notes after update"
+                              IsChecked="{Binding ShowReleaseNotesAfterUpdate}" />
+
+                    <Separator />
+
+                    <Button x:Name="CheckForUpdatesButton" Content="Check for Updates"
+                            Click="OnCheckForUpdatesClick" />
+                    <TextBlock x:Name="VersionLabel" FontSize="11" Opacity="0.7" />
+                </StackPanel>
+            </TabItem>
+        </TabControl>
 
         <Button Content="Save &amp; Close" Click="OnClose"
                 HorizontalAlignment="Right" Margin="0,8,0,0" />
-
 
     </StackPanel>
     </LayoutTransformControl>

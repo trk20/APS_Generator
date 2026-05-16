@@ -1,0 +1,20 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:md="https://github.com/whistyun/Markdown.Avalonia"
+        x:Class="ApsGenerator.UI.ReleaseNotesDialog"
+        Title="Release Notes"
+        SizeToContent="Height"
+        Width="500"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <StackPanel Margin="24" Spacing="12">
+        <TextBlock x:Name="VersionHeader" FontSize="18" FontWeight="Bold" />
+        <ScrollViewer MaxHeight="400">
+            <md:MarkdownScrollViewer x:Name="ReleaseNotesContent" />
+        </ScrollViewer>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button x:Name="UpdateButton" Content="Update &amp; Restart" Click="OnUpdateClick" />
+            <Button Content="Close" Click="OnCloseClick" />
+        </StackPanel>
+    </StackPanel>
+</Window>

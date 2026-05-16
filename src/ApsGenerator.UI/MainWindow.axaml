@@ -50,9 +50,26 @@
             <ScaleTransform ScaleX="{Binding UiScale}" ScaleY="{Binding UiScale}" />
         </LayoutTransformControl.LayoutTransform>
     <DockPanel>
-        <Menu DockPanel.Dock="Top">
-            <MenuItem Header="_Settings" Click="OnSettingsClick" />
-        </Menu>
+        <DockPanel DockPanel.Dock="Top">
+            <Menu>
+                <MenuItem Header="_Settings" Click="OnSettingsClick" />
+            </Menu>
+            <Button IsVisible="{Binding UpdateAvailable}"
+                    Click="OnUpdateIconClick"
+                    HorizontalAlignment="Right"
+                    Margin="0,0,8,0"
+                    Padding="8,2"
+                    FontSize="11"
+                    Background="#1565C0"
+                    Foreground="White"
+                    CornerRadius="3"
+                    ToolTip.Tip="Update available — click to view release notes">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="⬇" />
+                    <TextBlock Text="{Binding UpdateVersionText}" />
+                </StackPanel>
+            </Button>
+        </DockPanel>
 
         <Grid ColumnDefinitions="320,*">
 
@@ -83,6 +100,7 @@
                                            ToolTip.Tip="Grid width" />
                             <ToggleButton Grid.Column="1" IsChecked="{Binding IsHeightLocked, Mode=TwoWay}"
                                           Content="⇔" FontSize="14" Padding="6,2"
+                                          IsEnabled="{Binding IsLockButtonEnabled}"
                                           ToolTip.Tip="Lock dimensions together" />
                             <NumericUpDown Grid.Column="2" Value="{Binding TemplateHeight}"
                                            IsEnabled="{Binding IsHeightEditable}"

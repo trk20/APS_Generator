@@ -29,33 +29,44 @@ This tool provides a simple, user-friendly method to easily generate density-opt
 
 ## Installation
 
-Releases are **self-contained** - no .NET runtime installation required.
+Releases are **self-contained** - no .NET runtime installation required. After installation, updates are delivered automatically.
 
 #### Windows
 
-1. Download `APS-Generator-{version}-windows-x64.zip` from the [latest release](https://github.com/trk20/APS-Generator/releases).
-2. Extract the contents to a folder.
-3. Run `ApsGenerator.UI.exe`.
-4. When Windows shows "Windows protected your PC", click **More Info** → **Run Anyway**.
+1. Download `APS-Generator-Setup.exe` from the [latest release](https://github.com/trk20/APS-Generator/releases).
+2. Run the installer.
+3. When Windows shows "Windows protected your PC", click **More Info** → **Run Anyway**.
 
 | _More Info_                                                 | _Run Anyway_                                                |
 | ----------------------------------------------------------- | ----------------------------------------------------------- |
 | ![run-confirmation-1](readme-images/run-confirmation-1.png) | ![run-confirmation-2](readme-images/run-confirmation-2.png) |
 
-5. Done - move the folder anywhere and/or create a shortcut to the exe.
+4. The app will install and launch automatically. A desktop shortcut is created.
 
 > **Why does Windows block the program?**
 > The executable is unsigned - it doesn't have a certificate identifying its publisher. This is harmless; Windows just can't verify the source automatically.
 
 #### Linux
 
-1. Download `APS-Generator-{version}-linux-x64.zip` from the [latest release](https://github.com/trk20/APS-Generator/releases).
-2. Extract the contents to a folder.
-3. In a terminal, navigate to the folder and run:
+1. Download `APS-Generator.AppImage` from the [latest release](https://github.com/trk20/APS-Generator/releases).
+2. Make it executable and run:
    ```bash
-   chmod +x ApsGenerator.UI && ./ApsGenerator.UI
+   chmod +x APS-Generator.AppImage && ./APS-Generator.AppImage
    ```
-4. Done - the program should open.
+
+> **Modern Linux distributions (Arch, Ubuntu, Debian, etc.):** for now (may be fixed later), the generated AppImage requires FUSE2. Install it with:
+>
+> ```bash
+> sudo pacman -S fuse2
+> ```
+
+#### Updates
+
+The app checks for updates automatically on startup. You can configure update behavior in **Settings → Application**:
+
+- **Auto Update** - automatically download and apply updates (on by default)
+- **Receive experimental updates** - opt in to prerelease versions
+- **Show release notes after update** - display what's new after updating
 
 ---
 

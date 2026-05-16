@@ -296,7 +296,7 @@ public sealed class BlockRotationTests
     {
         // Build 3-neighbor list (all laterals except missingFace)
         Face[] allLaterals = [Face.Forward, Face.Back, Face.Right, Face.Left];
-        List<Face> neighbors = allLaterals.Where(f => f != missingFace).ToList();
+        List<Face> neighbors = [.. allLaterals.Where(f => f != missingFace)];
 
         var (blockId, blr) = CoolerBlockProfile.SelectBlock(neighbors);
 

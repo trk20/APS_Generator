@@ -55,6 +55,27 @@ public partial class MainWindowViewModel : ObservableObject
     private double uiScale = 1.0;
 
     [ObservableProperty]
+    private bool autoUpdate = true;
+
+    [ObservableProperty]
+    private bool receiveExperimentalUpdates;
+
+    [ObservableProperty]
+    private bool showReleaseNotesAfterUpdate = true;
+
+    [ObservableProperty]
+    private bool updateAvailable;
+
+    [ObservableProperty]
+    private string updateVersionText = "";
+
+    public string? PendingReleaseNotesVersion { get; set; }
+
+    public string? PendingReleaseNotesContent { get; set; }
+
+    public string? LastSeenUpdateVersion { get; set; }
+
+    [ObservableProperty]
     private bool earlyStopEnabled = true;
 
     [ObservableProperty]
@@ -145,6 +166,10 @@ public partial class MainWindowViewModel : ObservableObject
 
     public Func<Task>? ShowExportDialogAsync { get; set; }
 
+    public Func<Task>? ShowPendingReleaseNotes { get; set; }
+
+    public Func<Task>? ApplyPendingUpdate { get; set; }
+
     public Action<double>? ScaleChanged { get; set; }
 
     public int SliderMaximum => MaxPlacements;
@@ -152,6 +177,8 @@ public partial class MainWindowViewModel : ObservableObject
     public int SliderMinimum => MaxPlacements / 3;
 
     public bool IsHeightEditable => TemplateShape.Value == UiTemplateShape.Rectangle && !IsHeightLocked;
+
+    public bool IsLockButtonEnabled => TemplateShape.Value == UiTemplateShape.Rectangle;
 
     public bool IsSymmetryEnabled => SelectedSymmetryType.Value != SymmetryType.None;
 
@@ -207,7 +234,13 @@ public partial class MainWindowViewModel : ObservableObject
         DefaultExportHeightFiveClip = DefaultExportHeightFiveClip,
         ExportNameTemplate = ExportNameTemplate,
         NumSolutions = NumSolutions,
-        UiScale = UiScale
+        UiScale = UiScale,
+        AutoUpdate = AutoUpdate,
+        ReceiveExperimentalUpdates = ReceiveExperimentalUpdates,
+        ShowReleaseNotesAfterUpdate = ShowReleaseNotesAfterUpdate,
+        PendingReleaseNotesVersion = PendingReleaseNotesVersion,
+        PendingReleaseNotesContent = PendingReleaseNotesContent,
+        LastSeenUpdateVersion = LastSeenUpdateVersion
     };
 
     partial void OnDefaultExportHeightFiveClipChanged(int value)
@@ -265,6 +298,12 @@ public partial class MainWindowViewModel : ObservableObject
             MinSolverSeconds,
             MaxSolverSeconds);
         UiScale = settings.UiScale;
+        AutoUpdate = settings.AutoUpdate;
+        ReceiveExperimentalUpdates = settings.ReceiveExperimentalUpdates;
+        ShowReleaseNotesAfterUpdate = settings.ShowReleaseNotesAfterUpdate;
+        PendingReleaseNotesVersion = settings.PendingReleaseNotesVersion;
+        PendingReleaseNotesContent = settings.PendingReleaseNotesContent;
+        LastSeenUpdateVersion = settings.LastSeenUpdateVersion;
 
         TargetPlacementCount = settings.TargetPlacementCount >= 0
             ? settings.TargetPlacementCount
@@ -729,6 +768,7 @@ public partial class MainWindowViewModel : ObservableObject
         EnumDisplayItem<UiTemplateShape>? oldValue, EnumDisplayItem<UiTemplateShape> newValue)
     {
         OnPropertyChanged(nameof(IsHeightEditable));
+        OnPropertyChanged(nameof(IsLockButtonEnabled));
         if (suppressRegenerate) return;
 
         if (isGridDirty && oldValue is not null)
@@ -740,6 +780,7 @@ public partial class MainWindowViewModel : ObservableObject
                 {
                     TemplateShape = oldValue;
                     OnPropertyChanged(nameof(IsHeightEditable));
+                    OnPropertyChanged(nameof(IsLockButtonEnabled));
                 }
                 finally
                 {
@@ -747,6 +788,17 @@ public partial class MainWindowViewModel : ObservableObject
                 }
             });
             return;
+        }
+
+        if (newValue.Value != UiTemplateShape.Rectangle)
+        {
+            IsHeightLocked = true;
+            if (TemplateHeight != TemplateWidth)
+            {
+                suppressRegenerate = true;
+                TemplateHeight = TemplateWidth;
+                suppressRegenerate = false;
+            }
         }
 
         RegenerateGrid();

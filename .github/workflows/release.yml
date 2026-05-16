@@ -7,6 +7,11 @@ on:
         description: "Release version (e.g. 1.0.0)"
         required: true
         type: string
+      experimental:
+        description: "Mark as experimental/prerelease"
+        required: false
+        type: boolean
+        default: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -25,7 +30,7 @@ jobs:
           dotnet-quality: "ga"
 
       - name: Run tests
-        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=Slow'
+        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=RegressionBenchmark&Category!=Slow'
 
       # Linux native lib (libcryptominisat5.so) is already in runtimes/linux-x64/native/
       - name: Publish
@@ -34,18 +39,25 @@ jobs:
           -c Release
           -r linux-x64
           --self-contained
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:Version=${{ inputs.version }}
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk
 
       - name: Package
-        run: |
-          cd src/ApsGenerator.UI/bin/Release/net10.0/linux-x64/publish
-          zip -r "$GITHUB_WORKSPACE/APS-Generator-${{ inputs.version }}-linux-x64.zip" .
+        run: >
+          vpk pack
+          --packId APS-Generator
+          --packVersion ${{ inputs.version }}
+          --packDir src/ApsGenerator.UI/bin/Release/net10.0/linux-x64/publish
+          --mainExe ApsGenerator.UI
+          --releaseNotes release-notes.md
+          --outputDir releases
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-x64
-          path: APS-Generator-${{ inputs.version }}-linux-x64.zip
+          path: releases/
 
   build-windows:
     runs-on: windows-latest
@@ -103,7 +115,7 @@ jobs:
         shell: pwsh
         env:
           PATH: ${{ github.workspace }}\src\ApsGenerator.Solver\runtimes\win-x64\native;${{ env.PATH }}
-        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=Slow'
+        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=RegressionBenchmark&Category!=Slow'
 
       - name: Publish
         run: >
@@ -111,20 +123,25 @@ jobs:
           -c Release
           -r win-x64
           --self-contained
-          -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:Version=${{ inputs.version }}
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk
 
       - name: Package
-        shell: pwsh
-        run: |
-          Compress-Archive `
-            -Path "src/ApsGenerator.UI/bin/Release/net10.0/win-x64/publish/*" `
-            -DestinationPath "APS-Generator-${{ inputs.version }}-windows-x64.zip"
+        run: >
+          vpk pack
+          --packId APS-Generator
+          --packVersion ${{ inputs.version }}
+          --packDir src/ApsGenerator.UI/bin/Release/net10.0/win-x64/publish
+          --mainExe ApsGenerator.UI.exe
+          --releaseNotes release-notes.md
+          --outputDir releases
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: APS-Generator-${{ inputs.version }}-windows-x64.zip
+          path: releases/
 
   release:
     needs: [build-linux, build-windows]
@@ -132,19 +149,52 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+          dotnet-quality: "ga"
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk
+
       - uses: actions/download-artifact@v4
         with:
           name: linux-x64
+          path: releases/linux
 
       - uses: actions/download-artifact@v4
         with:
           name: windows-x64
+          path: releases/windows
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ inputs.version }}
-          name: v${{ inputs.version }}
-          files: |
-            APS-Generator-${{ inputs.version }}-linux-x64.zip
-            APS-Generator-${{ inputs.version }}-windows-x64.zip
+      - name: Upload Linux Release
+        run: >
+          vpk upload github
+          --repoUrl https://github.com/${{ github.repository }}
+          --outputDir releases/linux
+          --channel linux
+          --tag v${{ inputs.version }}
+          --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}"
+          --publish
+          ${{ inputs.experimental && '--pre' || '' }}
+          --token ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows Release
+        run: >
+          vpk upload github
+          --repoUrl https://github.com/${{ github.repository }}
+          --outputDir releases/windows
+          --channel win
+          --tag v${{ inputs.version }}
+          --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}"
+          --publish
+          --merge
+          ${{ inputs.experimental && '--pre' || '' }}
+          --token ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set release body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "v${{ inputs.version }}" --notes-file release-notes.md

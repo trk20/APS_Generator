@@ -40,6 +40,22 @@ public partial class MainWindow : Window
         await dialog.ShowDialog(this);
     }
 
+    private async void OnUpdateIconClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm || vm.ShowPendingReleaseNotes is null)
+            return;
+
+        try
+        {
+            await vm.ShowPendingReleaseNotes();
+        }
+        catch (Exception ex)
+        {
+            var dialog = new ConfirmationDialog($"Update failed: {ex.Message}", vm.UiScale);
+            await dialog.ShowDialog(this);
+        }
+    }
+
     private async Task<bool> ShowConfirmationAsync(string message)
     {
         var dialog = new ConfirmationDialog(message);
