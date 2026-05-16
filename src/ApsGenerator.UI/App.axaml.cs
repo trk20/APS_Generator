@@ -35,8 +35,7 @@ public partial class App : Application
             var settings = UserSettingsStore.Load();
             if (!string.IsNullOrEmpty(settings.PendingReleaseNotesVersion))
             {
-                if (settings.PendingReleaseNotesVersion == UpdateService.GetCurrentVersion()
-                    && vm.ShowReleaseNotesAfterUpdate)
+                if (vm.ShowReleaseNotesAfterUpdate)
                 {
                     var notes = UpdateService.ProcessReleaseNotes(
                         settings.PendingReleaseNotesContent,
