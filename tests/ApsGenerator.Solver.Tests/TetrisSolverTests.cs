@@ -11,13 +11,22 @@ public sealed class TetrisSolverTests
 
     public TetrisSolverTests(ITestOutputHelper output) => _output = output;
 
+    /// <summary>
+    /// Disables the early-stop heuristic for tests that assert optimal or reference cluster counts
+    /// </summary>
+    private static SolverOptions ConsistentTestOptions(double maxTimeSeconds = 30) => new()
+    {
+        MaxTimeSeconds = maxTimeSeconds,
+        EarlyStopEnabled = false,
+    };
+
     [Fact]
     public void Solve_Grid3x3_AllAvailable_FourClip_FindsSingleCenteredCluster()
     {
         var grid = TemplateGenerator.Rectangle(width: 3, height: 3);
 
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip);
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.Equal(1, result.ClusterCount);
@@ -43,7 +52,7 @@ public sealed class TetrisSolverTests
         var grid = TemplateGenerator.Circle(diameter: 5, blockCenter: true);
 
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip);
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 4);
@@ -104,7 +113,7 @@ public sealed class TetrisSolverTests
         var grid = TemplateGenerator.Circle(diameter: 11, blockCenter: true);
 
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip);
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 14);
@@ -116,7 +125,7 @@ public sealed class TetrisSolverTests
         var grid = TemplateGenerator.Circle(diameter: 5, blockCenter: true);
 
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip);
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.Equal(4, result.ClusterCount);
@@ -245,7 +254,7 @@ public sealed class TetrisSolverTests
 
         var solver = new TetrisSolver();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, new SolverOptions { MaxTimeSeconds = 30 });
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions(30));
         stopwatch.Stop();
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
@@ -258,7 +267,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 17, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, new SolverOptions { MaxTimeSeconds = 60 });
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions(60));
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 53, $"Expected >= 53 clusters, got {result.ClusterCount}");
@@ -269,7 +278,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 11, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip);
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.Equal(15, result.ClusterCount);
@@ -281,7 +290,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 23, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, new SolverOptions { MaxTimeSeconds = 120 });
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions(120));
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 103, $"Expected >= 103 clusters, got {result.ClusterCount}");
@@ -293,7 +302,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 29, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, new SolverOptions { MaxTimeSeconds = 300 });
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions(300));
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 164, $"Expected >= 164 clusters, got {result.ClusterCount}");
@@ -305,7 +314,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 33, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, new SolverOptions { MaxTimeSeconds = 420 });
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions(420));
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 212, $"Expected >= 212 clusters, got {result.ClusterCount}");
@@ -317,7 +326,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 15, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip, new SolverOptions { MaxTimeSeconds = 60 });
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions(60));
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 27, $"Expected >= 27 clusters, got {result.ClusterCount}");
@@ -329,7 +338,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 17, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip, new SolverOptions { MaxTimeSeconds = 120 });
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions(120));
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 36, $"Expected >= 36 clusters, got {result.ClusterCount}");
@@ -341,7 +350,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 23, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip, new SolverOptions { MaxTimeSeconds = 300 });
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions(300));
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 60, $"Expected >= 60 clusters, got {result.ClusterCount}");
@@ -364,7 +373,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 11, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, new SolverOptions { MaxTimeSeconds = 60 });
+        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, ConsistentTestOptions(60));
 
         AssertSolutionValid(grid, TetrisType.FiveClip, result);
         Assert.True(result.ClusterCount >= 10);
@@ -376,7 +385,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 15, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, new SolverOptions { MaxTimeSeconds = 120 });
+        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, ConsistentTestOptions(120));
 
         AssertSolutionValid(grid, TetrisType.FiveClip, result);
         Assert.True(result.ClusterCount >= 30, $"Expected >= 30 clusters, got {result.ClusterCount}");
@@ -387,7 +396,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Rectangle(width: 8, height: 8);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip);
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 15, $"Expected >= 15 clusters, got {result.ClusterCount}");
@@ -398,7 +407,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Rectangle(width: 10, height: 10);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip);
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 13, $"Expected >= 13 clusters, got {result.ClusterCount}");
@@ -409,7 +418,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 11, blockCenter: false);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip);
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 18, $"Expected >= 18 clusters, got {result.ClusterCount}");
@@ -421,7 +430,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 15, blockCenter: false);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, new SolverOptions { MaxTimeSeconds = 60 });
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions(60));
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 43, $"Expected >= 43 clusters, got {result.ClusterCount}");
@@ -435,7 +444,7 @@ public sealed class TetrisSolverTests
         // 37 total cells, 36 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 7, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip);
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 7, $"Expected >= 7 clusters, got {result.ClusterCount}");
@@ -447,7 +456,7 @@ public sealed class TetrisSolverTests
         // 69 total cells, 68 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 9, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip);
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 14, $"Expected >= 14 clusters, got {result.ClusterCount}");
@@ -459,7 +468,7 @@ public sealed class TetrisSolverTests
         // 97 total cells, 96 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 11, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip);
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 20, $"Expected >= 20 clusters, got {result.ClusterCount}");
@@ -471,7 +480,7 @@ public sealed class TetrisSolverTests
         // 137 total cells, 136 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 13, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, new SolverOptions { MaxTimeSeconds = 60 });
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions(60));
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 28, $"Expected >= 28 clusters, got {result.ClusterCount}");
@@ -483,7 +492,7 @@ public sealed class TetrisSolverTests
         // 293 total cells, 292 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 19, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, new SolverOptions { MaxTimeSeconds = 120 });
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions(120));
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 62, $"Expected >= 62 clusters, got {result.ClusterCount}");
@@ -495,7 +504,7 @@ public sealed class TetrisSolverTests
         // 349 total cells, 348 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 21, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, new SolverOptions { MaxTimeSeconds = 120 });
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions(120));
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 73, $"Expected >= 73 clusters, got {result.ClusterCount}");
@@ -507,7 +516,7 @@ public sealed class TetrisSolverTests
         // 489 total cells, 488 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 25, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, new SolverOptions { MaxTimeSeconds = 300 });
+        SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, ConsistentTestOptions(300));
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 103, $"Expected >= 103 clusters, got {result.ClusterCount}");
@@ -521,7 +530,7 @@ public sealed class TetrisSolverTests
         // 21 total cells, 20 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 5, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip);
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 2, $"Expected >= 2 clusters, got {result.ClusterCount}");
@@ -533,7 +542,7 @@ public sealed class TetrisSolverTests
         // 37 total cells, 36 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 7, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip);
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 5, $"Expected >= 5 clusters, got {result.ClusterCount}");
@@ -545,7 +554,7 @@ public sealed class TetrisSolverTests
         // 69 total cells, 68 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 9, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip);
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 9, $"Expected >= 9 clusters, got {result.ClusterCount}");
@@ -557,7 +566,7 @@ public sealed class TetrisSolverTests
         // 137 total cells, 136 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 13, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip, new SolverOptions { MaxTimeSeconds = 60 });
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions(60));
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 19, $"Expected >= 19 clusters, got {result.ClusterCount}");
@@ -570,7 +579,7 @@ public sealed class TetrisSolverTests
         // 293 total cells, 292 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 19, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip, new SolverOptions { MaxTimeSeconds = 120 });
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions(120));
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 40, $"Expected >= 40 clusters, got {result.ClusterCount}");
@@ -583,7 +592,7 @@ public sealed class TetrisSolverTests
         // 349 total cells, 348 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 21, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip, new SolverOptions { MaxTimeSeconds = 120 });
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions(120));
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 48, $"Expected >= 48 clusters, got {result.ClusterCount}");
@@ -597,7 +606,7 @@ public sealed class TetrisSolverTests
         // 489 total cells, 488 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 25, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FourClip, new SolverOptions { MaxTimeSeconds = 300 });
+        SolverResult result = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions(300));
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 68, $"Expected >= 68 clusters, got {result.ClusterCount}");
@@ -611,7 +620,7 @@ public sealed class TetrisSolverTests
         // 37 total cells, 36 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 7, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FiveClip);
+        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.FiveClip, result);
         Assert.True(result.ClusterCount >= 5, $"Expected >= 5 clusters, got {result.ClusterCount}");
@@ -623,7 +632,7 @@ public sealed class TetrisSolverTests
         // 69 total cells, 68 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 9, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FiveClip);
+        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, ConsistentTestOptions());
 
         AssertSolutionValid(grid, TetrisType.FiveClip, result);
         Assert.True(result.ClusterCount >= 9, $"Expected >= 9 clusters, got {result.ClusterCount}");
@@ -635,7 +644,7 @@ public sealed class TetrisSolverTests
         // 137 total cells, 136 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 13, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, new SolverOptions { MaxTimeSeconds = 60 });
+        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, ConsistentTestOptions(60));
 
         AssertSolutionValid(grid, TetrisType.FiveClip, result);
         Assert.True(result.ClusterCount >= 19, $"Expected >= 19 clusters, got {result.ClusterCount}");
@@ -648,7 +657,7 @@ public sealed class TetrisSolverTests
         // 225 total cells, 224 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 17, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, new SolverOptions { MaxTimeSeconds = 60 });
+        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, ConsistentTestOptions(60));
 
         AssertSolutionValid(grid, TetrisType.FiveClip, result);
         Assert.True(result.ClusterCount >= 31, $"Expected >= 31 clusters, got {result.ClusterCount}");
@@ -661,7 +670,7 @@ public sealed class TetrisSolverTests
         // 293 total cells, 292 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 19, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, new SolverOptions { MaxTimeSeconds = 120 });
+        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, ConsistentTestOptions(120));
 
         AssertSolutionValid(grid, TetrisType.FiveClip, result);
         Assert.True(result.ClusterCount >= 40, $"Expected >= 40 clusters, got {result.ClusterCount}");
@@ -674,7 +683,7 @@ public sealed class TetrisSolverTests
         // 349 total cells, 348 available (blocked center)
         var grid = TemplateGenerator.Circle(diameter: 21, blockCenter: true);
         var solver = new TetrisSolver();
-        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, new SolverOptions { MaxTimeSeconds = 120 });
+        SolverResult result = solver.Solve(grid, TetrisType.FiveClip, ConsistentTestOptions(120));
 
         AssertSolutionValid(grid, TetrisType.FiveClip, result);
         Assert.True(result.ClusterCount >= 48, $"Expected >= 48 clusters, got {result.ClusterCount}");
@@ -685,10 +694,10 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 5, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions
+        var opts = ConsistentTestOptions() with
         {
             SymmetryType = SymmetryType.HorizontalReflection,
-            SymmetryMode = SymmetryMode.Hard
+            SymmetryMode = SymmetryMode.Hard,
         };
         SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, opts);
         SolutionVisualizer.Print(_output, grid, TetrisType.ThreeClip, result);
@@ -706,10 +715,10 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 5, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions
+        var opts = ConsistentTestOptions() with
         {
             SymmetryType = SymmetryType.VerticalReflection,
-            SymmetryMode = SymmetryMode.Hard
+            SymmetryMode = SymmetryMode.Hard,
         };
         SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, opts);
         SolutionVisualizer.Print(_output, grid, TetrisType.ThreeClip, result);
@@ -727,10 +736,10 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 7, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions
+        var opts = ConsistentTestOptions() with
         {
             SymmetryType = SymmetryType.HorizontalReflection,
-            SymmetryMode = SymmetryMode.Hard
+            SymmetryMode = SymmetryMode.Hard,
         };
         SolverResult result = solver.Solve(grid, TetrisType.FiveClip, opts);
         SolutionVisualizer.Print(_output, grid, TetrisType.FiveClip, result);
@@ -748,10 +757,10 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 7, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions
+        var opts = ConsistentTestOptions() with
         {
             SymmetryType = SymmetryType.VerticalReflection,
-            SymmetryMode = SymmetryMode.Hard
+            SymmetryMode = SymmetryMode.Hard,
         };
         SolverResult result = solver.Solve(grid, TetrisType.FiveClip, opts);
         SolutionVisualizer.Print(_output, grid, TetrisType.FiveClip, result);
@@ -769,10 +778,10 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 9, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions
+        var opts = ConsistentTestOptions() with
         {
             SymmetryType = SymmetryType.Rotation90,
-            SymmetryMode = SymmetryMode.Hard
+            SymmetryMode = SymmetryMode.Hard,
         };
         SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, opts);
         SolutionVisualizer.Print(_output, grid, TetrisType.ThreeClip, result);
@@ -790,10 +799,10 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 9, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions
+        var opts = ConsistentTestOptions() with
         {
             SymmetryType = SymmetryType.BothReflection,
-            SymmetryMode = SymmetryMode.Hard
+            SymmetryMode = SymmetryMode.Hard,
         };
         SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, opts);
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
@@ -821,10 +830,10 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Rectangle(width: 4, height: 5);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions
+        var opts = ConsistentTestOptions() with
         {
             SymmetryType = SymmetryType.Rotation90,
-            SymmetryMode = SymmetryMode.Hard
+            SymmetryMode = SymmetryMode.Hard,
         };
 
         Assert.Throws<ArgumentException>(() => solver.Solve(grid, TetrisType.ThreeClip, opts));
@@ -835,10 +844,10 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 11, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions
+        var opts = ConsistentTestOptions() with
         {
             SymmetryType = SymmetryType.Rotation180,
-            SymmetryMode = SymmetryMode.Hard
+            SymmetryMode = SymmetryMode.Hard,
         };
         SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, opts);
         SolutionVisualizer.Print(_output, grid, TetrisType.ThreeClip, result);
@@ -857,17 +866,17 @@ public sealed class TetrisSolverTests
         var grid = TemplateGenerator.Circle(diameter: 11, blockCenter: true);
         var solver = new TetrisSolver();
 
-        var hardResult = solver.Solve(grid, TetrisType.FourClip, new SolverOptions
+        var hardResult = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions() with
         {
             SymmetryType = SymmetryType.HorizontalReflection,
-            SymmetryMode = SymmetryMode.Hard
+            SymmetryMode = SymmetryMode.Hard,
         });
         SolutionVisualizer.Print(_output, grid, TetrisType.FourClip, hardResult);
 
-        var softResult = solver.Solve(grid, TetrisType.FourClip, new SolverOptions
+        var softResult = solver.Solve(grid, TetrisType.FourClip, ConsistentTestOptions() with
         {
             SymmetryType = SymmetryType.HorizontalReflection,
-            SymmetryMode = SymmetryMode.Soft
+            SymmetryMode = SymmetryMode.Soft,
         });
         SolutionVisualizer.Print(_output, grid, TetrisType.FourClip, softResult);
 
@@ -956,7 +965,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 5, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions { NumSolutions = 3, MaxTimeSeconds = 10 };
+        var opts = ConsistentTestOptions(10) with { NumSolutions = 3 };
 
         SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, opts);
 
@@ -985,7 +994,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 5, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions { NumSolutions = 3, MaxTimeSeconds = 10 };
+        var opts = ConsistentTestOptions(10) with { NumSolutions = 3 };
 
         SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, opts);
 
@@ -1000,7 +1009,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 5, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions { NumSolutions = 3, MaxTimeSeconds = 10 };
+        var opts = ConsistentTestOptions(10) with { NumSolutions = 3 };
         var type = TetrisType.ThreeClip;
 
         SolverResult result = solver.Solve(grid, type, opts);
@@ -1041,7 +1050,7 @@ public sealed class TetrisSolverTests
     {
         var grid = TemplateGenerator.Circle(diameter: 5, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions { NumSolutions = 1, MaxTimeSeconds = 10 };
+        var opts = ConsistentTestOptions(10) with { NumSolutions = 1 };
 
         SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, opts);
 
@@ -1059,7 +1068,7 @@ public sealed class TetrisSolverTests
         // where the retained solver was being disposed before UNSAT-termination.
         var grid = TemplateGenerator.Circle(diameter: 5, blockCenter: true);
         var solver = new TetrisSolver();
-        var opts = new SolverOptions { NumSolutions = 5, MaxTimeSeconds = 10 };
+        var opts = ConsistentTestOptions(10) with { NumSolutions = 5 };
 
         SolverResult result = solver.Solve(grid, TetrisType.ThreeClip, opts);
 
