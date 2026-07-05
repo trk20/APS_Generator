@@ -1,6 +1,6 @@
 # Changes
 
-- Added functionality to check for new versions and allow easy updating
+- Added effective autoloader count to solve results
 
 <!-- install-start -->
 
