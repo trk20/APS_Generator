@@ -33,7 +33,7 @@ Releases are **self-contained** - no .NET runtime installation required. After i
 
 #### Windows
 
-1. Download `APS-Generator-Setup.exe` from the [latest release](https://github.com/trk20/APS-Generator/releases).
+1. Download `APS-Generator-Setup.exe` from the [latest release](https://github.com/trk20/APS_Generator/releases/latest).
 2. Run the installer.
 3. When Windows shows "Windows protected your PC", click **More Info** → **Run Anyway**.
 
@@ -48,7 +48,7 @@ Releases are **self-contained** - no .NET runtime installation required. After i
 
 #### Linux
 
-1. Download `APS-Generator.AppImage` from the [latest release](https://github.com/trk20/APS-Generator/releases).
+1. Download `APS-Generator.AppImage` from the [latest release](https://github.com/trk20/APS_Generator/releases/latest).
 2. Make it executable and run:
    ```bash
    chmod +x APS-Generator.AppImage && ./APS-Generator.AppImage
