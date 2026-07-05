@@ -215,6 +215,11 @@
                             <TextBlock Text="Placed:" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding PlacedText}" />
                         </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="4"
+                                    IsVisible="{Binding EffectiveAutoloadersText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                            <TextBlock Text="Effective autoloaders:" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding EffectiveAutoloadersText}" />
+                        </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="4">
                             <TextBlock Text="Status:" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding StatusLabel}"

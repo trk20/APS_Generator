@@ -29,10 +29,31 @@ jobs:
           dotnet-version: "10.0.x"
           dotnet-quality: "ga"
 
+      - name: Install CryptoMiniSat build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build git \
+            libgmp-dev zlib1g-dev
+
+      - name: Build CryptoMiniSat from source
+        run: |
+          cd native/cryptominisat
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_PYTHON_EXTENSION=OFF
+          cmake --build build --target cryptominisat5
+
+      - name: Copy CMS shared library to runtimes
+        run: |
+          DEST="src/ApsGenerator.Solver/runtimes/linux-x64/native"
+          mkdir -p "$DEST"
+          cp native/cryptominisat/build/lib/libcryptominisat5.so "$DEST/"
+          ls -la "$DEST"
+
       - name: Run tests
         run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=RegressionBenchmark&Category!=Slow'
 
-      # Linux native lib (libcryptominisat5.so) is already in runtimes/linux-x64/native/
       - name: Publish
         run: >
           dotnet publish src/ApsGenerator.UI/ApsGenerator.UI.csproj
@@ -92,7 +113,7 @@ jobs:
           cd native/cryptominisat
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DENABLE_PYTHON_INTERFACE=OFF \
+            -DBUILD_PYTHON_EXTENSION=OFF \
             -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++"
           cmake --build build --target cryptominisat5
 

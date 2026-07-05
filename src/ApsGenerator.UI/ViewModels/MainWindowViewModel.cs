@@ -93,8 +93,18 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private SolverResult? solverResult;
 
+    private int displayedPlacementCount = -1;
+
+    public string PlacedText =>
+        displayedPlacementCount < 0 ? "" : $"{displayedPlacementCount} / {MaxPlacements}";
+
+    public string EffectiveAutoloadersText =>
+        displayedPlacementCount < 0
+            ? ""
+            : (displayedPlacementCount * SelectedTetrisType.Value.EffectiveAutoloadersPerPlacement()).ToString();
+
     [ObservableProperty]
-    private string placedText = "";
+    private bool hasSolverRun;
 
     [ObservableProperty]
     private string statusLabel = "Ready";
@@ -387,11 +397,26 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void ClearStatus()
     {
-        PlacedText = "";
+        ClearPlacementDisplay();
+        HasSolverRun = false;
         StatusLabel = "Ready";
         ElapsedTimeText = "";
         StatusDetailText = "";
         StatusForeground = DefaultStatusBrush;
+    }
+
+    private void ClearPlacementDisplay()
+    {
+        displayedPlacementCount = -1;
+        OnPropertyChanged(nameof(PlacedText));
+        OnPropertyChanged(nameof(EffectiveAutoloadersText));
+    }
+
+    private void UpdatePlacementDisplay(int placementCount)
+    {
+        displayedPlacementCount = placementCount;
+        OnPropertyChanged(nameof(PlacedText));
+        OnPropertyChanged(nameof(EffectiveAutoloadersText));
     }
 
     private async Task MaybeRegenerateWithConfirmationAsync(Action? revertAction = null)
@@ -508,8 +533,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     private static int GetTheoreticalMaxClusters(TetrisType type, int availableCells) => type switch
     {
-        TetrisType.ThreeClip => availableCells / 4,
-        TetrisType.FourClip => availableCells / 5,
+        TetrisType.ThreeClip or TetrisType.FourClip => availableCells / type.EffectiveAutoloadersPerPlacement(),
         TetrisType.FiveClip => (2 * availableCells) / 9,
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported tetris type.")
     };
@@ -570,7 +594,7 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task GenerateAsync()
     {
         IsGenerating = true;
-        PlacedText = "";
+        ClearPlacementDisplay();
         StatusLabel = "Solving...";
         ElapsedTimeText = "";
         StatusDetailText = "";
@@ -642,7 +666,7 @@ public partial class MainWindowViewModel : ObservableObject
 
             SolverResult = result;
             CanExport = result.Placements.Count > 0;
-            PlacedText = $"{result.ClusterCount} / {MaxPlacements}";
+            UpdatePlacementDisplay(result.ClusterCount);
             StatusLabel = result.Status switch
             {
                 SolverStatus.Optimal => "Optimal",
@@ -675,6 +699,7 @@ public partial class MainWindowViewModel : ObservableObject
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
             IsGenerating = false;
+            HasSolverRun = true;
         }
     }
 
@@ -753,7 +778,7 @@ public partial class MainWindowViewModel : ObservableObject
         };
 
         CanExport = placements.Count > 0;
-        PlacedText = $"{placements.Count} / {MaxPlacements}";
+        UpdatePlacementDisplay(placements.Count);
     }
 
     partial void OnIsGeneratingChanged(bool value)
