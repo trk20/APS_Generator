@@ -12,8 +12,8 @@ APS Generator is a single **.NET 10 Avalonia desktop GUI app** (no servers, data
 ### Build / test / run
 - Build: `dotnet build ApsGenerator.slnx -c Release`
 - Test (matches CI, excludes slow/benchmark categories): `dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=RegressionBenchmark&Category!=Slow'`. The full solver suite still takes ~45s.
-- Run the GUI: `dotnet run --project src/ApsGenerator.UI/ApsGenerator.UI.csproj -c Release`. It needs an X11 display (use `DISPLAY=:1` in this VM). The app writes little/nothing to stdout; confirm it is up via the process (`ApsGenerator.UI`) or a screenshot, not logs.
-- Solve time scales steeply with grid size / clip count. For a quick manual test use a small grid (e.g. 5×5 rectangle, 3-Clip), which solves near-instantly; a default 11×11 circle can take ~40s.
+- Run the GUI: `dotnet run --project src/ApsGenerator.UI/ApsGenerator.UI.csproj -c Release`. It's a normal cross-platform Avalonia desktop app and runs on either X11 or Wayland (e.g. niri) with no extra setup; in this VM a display is available at `DISPLAY=:1`. The app writes little/nothing to stdout; confirm it is up via the process (`ApsGenerator.UI`) or a screenshot, not logs.
+- Solve time is driven mainly by clip count and symmetry, not grid size (a 15×15 solve can finish in ~71ms). 3-Clip is the fastest; 4-Clip and 5-Clip take considerably longer. Enabling symmetry decreases solve time dramatically, and hard symmetry is generally preferable. 4-Clip usually prefers rotational symmetry, while reflexive symmetry is strictly better for 5-Clip. For a quick manual test, 3-Clip solves near-instantly at typical grid sizes.
 
 ### Lint / formatting
 - There is no configured linter or CI lint step and no `.editorconfig`. Compilation with 0 warnings is the effective check. `dotnet format --verify-no-changes` reports pre-existing whitespace deviations in the test projects that are **not** enforced — do not "fix" them as part of unrelated work.
