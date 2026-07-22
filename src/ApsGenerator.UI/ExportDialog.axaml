@@ -16,6 +16,9 @@
                        FormatString="0"
                        Minimum="1" Maximum="8" Value="2" Increment="1" />
 
+		<TextBlock x:Name="ToggleEjectorsLabel" Text="Include Ejectors?" />
+		<CheckBox x:Name="ToggleEjectors" IsChecked="True"></CheckBox>
+
         <TextBlock Text="Bill of Materials" FontWeight="SemiBold" />
         <ItemsControl x:Name="BomList" Margin="8,0,0,0">
             <ItemsControl.ItemTemplate>

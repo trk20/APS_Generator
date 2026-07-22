@@ -18,7 +18,7 @@ public sealed class BlueprintExportTests
             Array.Empty<Placement>(),
             grid,
             TetrisType.FourClip,
-            new ExportOptions("empty", TargetHeight: 2));
+            new ExportOptions("empty", TargetHeight: 2, true));
 
         BlueprintFile blueprint = ParseBlueprint(json);
 
@@ -39,7 +39,7 @@ public sealed class BlueprintExportTests
             placements,
             grid,
             TetrisType.FourClip,
-            new ExportOptions("single-four-clip-h2", TargetHeight: 2));
+            new ExportOptions("single-four-clip-h2", TargetHeight: 2, true));
 
         BlueprintFile blueprint = ParseBlueprint(json);
 
@@ -82,7 +82,7 @@ public sealed class BlueprintExportTests
             placements,
             grid,
             TetrisType.FourClip,
-            new ExportOptions("single-four-clip-h1-bottom", TargetHeight: 1));
+            new ExportOptions("single-four-clip-h1-bottom", TargetHeight: 1, true));
 
         BlueprintFile blueprint = ParseBlueprint(json);
 
@@ -123,7 +123,7 @@ public sealed class BlueprintExportTests
             placements,
             grid,
             TetrisType.ThreeClip,
-            new ExportOptions("single-three-clip-h1-bottom", TargetHeight: 1));
+            new ExportOptions("single-three-clip-h1-bottom", TargetHeight: 1, true));
 
         BlueprintFile blueprint = ParseBlueprint(json);
 
@@ -169,7 +169,7 @@ public sealed class BlueprintExportTests
             placements,
             grid,
             TetrisType.ThreeClip,
-            new ExportOptions("single-three-clip-left-bottom", TargetHeight: 1));
+            new ExportOptions("single-three-clip-left-bottom", TargetHeight: 1, true));
 
         BlueprintFile blueprint = ParseBlueprint(json);
 
@@ -197,7 +197,7 @@ public sealed class BlueprintExportTests
             placements,
             grid,
             TetrisType.ThreeClip,
-            new ExportOptions("single-three-clip-h2-cost", TargetHeight: 2));
+            new ExportOptions("single-three-clip-h2-cost", TargetHeight: 2, true));
 
         BlueprintFile blueprint = ParseBlueprint(json);
 
@@ -227,7 +227,7 @@ public sealed class BlueprintExportTests
             placements,
             grid,
             TetrisType.FiveClip,
-            new ExportOptions("shared-connector", TargetHeight: 3));
+            new ExportOptions("shared-connector", TargetHeight: 3, true));
 
         BlueprintFile blueprint = ParseBlueprint(json);
 
@@ -245,7 +245,7 @@ public sealed class BlueprintExportTests
                 placements,
                 grid,
                 TetrisType.FiveClip,
-                new ExportOptions("invalid-five", TargetHeight: 4)));
+                new ExportOptions("invalid-five", TargetHeight: 4, true)));
 
         Assert.Contains("5-clip target height must be a positive multiple of 3 (got 4).", ex.Message);
     }
@@ -260,7 +260,7 @@ public sealed class BlueprintExportTests
             placements,
             grid,
             TetrisType.FourClip,
-            new ExportOptions("block-data-index", TargetHeight: 1));
+            new ExportOptions("block-data-index", TargetHeight: 1, true));
 
         BlueprintFile blueprint = ParseBlueprint(json);
         Assert.NotEmpty(blueprint.Blueprint.BlockData);
