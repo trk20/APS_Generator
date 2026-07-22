@@ -100,13 +100,19 @@ internal static class BlueprintBuilder
             int loaderBlr = BlockRotation.FindRotation(LoaderPrimary, loaderTarget, LoaderSecondary, LoaderSecondaryTarget);
             EmitBlock(emittedBlocks, loaderX, 0, loaderZ, loaderKey, loaderBlr);
 
-            if (includeEjectors) {
+            if (includeEjectors)
+            {
                 Vector3 ejectorTarget = type == TetrisType.ThreeClip
                     ? loaderTarget
                     : DefaultEjectorTarget;
                 int ejectorBlr = BlockRotation.FindRotation(EjectorPrimary, ejectorTarget, EjectorSecondary, EjectorSecondaryTarget);
                 EmitBlock(emittedBlocks, loaderX, -1, loaderZ, "Ejector_1", ejectorBlr);
                     ReserveEjectorClearanceCell(reservedIntakePositions, loaderX, loaderZ, ejectorTarget);
+            }
+            else
+            {
+                int intakeBlr = BlockRotation.FindRotation(IntakePrimary, Vector3.UnitY, IntakeSecondary, -Vector3.UnitZ);
+                EmitBlock(emittedBlocks, loaderX, -1, loaderZ, "AmmoIntake_1", intakeBlr, GameData.GetAmmoIntakeBlockData(Vector3.UnitY));
             }
 
             foreach (CellOffset offset in shape.Offsets)
