@@ -61,6 +61,7 @@ public partial class ExportDialog : Window
             handledEventsToo: true);
         BlueprintNameBox.TextChanged += OnBlueprintNameTextChanged;
         TargetHeightBox.ValueChanged += OnTargetHeightValueChanged;
+        ToggleEjectors.IsCheckedChanged += OnToggleEjectorsChanged;
         hasManualBlueprintNameEdit = false;
         UpdateAutoBlueprintName();
         SaveLocationBox.Text = ResolveDefaultFolder(lastExportFolder);
@@ -149,13 +150,17 @@ public partial class ExportDialog : Window
         hasManualBlueprintNameEdit = true;
     }
 
+    private void OnToggleEjectorsChanged(object? sender, EventArgs e) {
+        UpdateBillOfMaterials();
+    }
+
     private void UpdateBillOfMaterials()
     {
         int targetHeight = (int)(TargetHeightBox.Value ?? 2);
 
         try
         {
-            var previewOptions = new ExportOptions(BlueprintNameBox.Text ?? string.Empty, targetHeight);
+            var previewOptions = new ExportOptions(BlueprintNameBox.Text ?? string.Empty, targetHeight, ToggleEjectors.IsChecked ?? true);
             BlueprintFile previewBlueprint = BlueprintBuilder.Build(placements, grid, tetrisType, previewOptions);
 
             var idToBlock = new Dictionary<int, BlockDefinition>();
@@ -294,6 +299,12 @@ public partial class ExportDialog : Window
             TargetHeightBox.Value = targetHeight;
         }
 
+        if (ToggleEjectors.IsChecked is not bool toggleEjectors)
+        {
+            ShowError("Toggle ejectors must be true or false");
+            return;
+        }
+
         var saveLocation = SaveLocationBox.Text?.Trim();
         if (string.IsNullOrWhiteSpace(saveLocation))
         {
@@ -320,7 +331,7 @@ public partial class ExportDialog : Window
 
         try
         {
-            var options = new ExportOptions(name, targetHeight);
+            var options = new ExportOptions(name, targetHeight, toggleEjectors);
             BlueprintExporter.Export(placements, grid, tetrisType, options, filePath);
             Tag = saveLocation;
             Close(true);

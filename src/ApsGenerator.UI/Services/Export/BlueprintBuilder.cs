@@ -53,7 +53,7 @@ internal static class BlueprintBuilder
             if (type == TetrisType.FiveClip)
                 EmitFiveClipBlocks(placements, grid, options.TargetHeight, emittedBlocks);
             else
-                EmitScaleBasicBlocks(placements, grid, type, options.TargetHeight, emittedBlocks);
+                EmitScaleBasicBlocks(placements, grid, type, options.TargetHeight, options.IncludeEjectors, emittedBlocks);
         }
 
         return AssembleBlueprint(options.BlueprintName, options.TargetHeight, emittedBlocks);
@@ -78,6 +78,7 @@ internal static class BlueprintBuilder
         Grid grid,
         TetrisType type,
         int targetHeight,
+        bool includeEjectors,
         Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
     {
         IReadOnlyList<ClusterShape> shapes = ClusterShape.GetShapes(type);
@@ -99,12 +100,20 @@ internal static class BlueprintBuilder
             int loaderBlr = BlockRotation.FindRotation(LoaderPrimary, loaderTarget, LoaderSecondary, LoaderSecondaryTarget);
             EmitBlock(emittedBlocks, loaderX, 0, loaderZ, loaderKey, loaderBlr);
 
-            Vector3 ejectorTarget = type == TetrisType.ThreeClip
-                ? loaderTarget
-                : DefaultEjectorTarget;
-            int ejectorBlr = BlockRotation.FindRotation(EjectorPrimary, ejectorTarget, EjectorSecondary, EjectorSecondaryTarget);
-            EmitBlock(emittedBlocks, loaderX, -1, loaderZ, "Ejector_1", ejectorBlr);
-            ReserveEjectorClearanceCell(reservedIntakePositions, loaderX, loaderZ, ejectorTarget);
+            if (includeEjectors)
+            {
+                Vector3 ejectorTarget = type == TetrisType.ThreeClip
+                    ? loaderTarget
+                    : DefaultEjectorTarget;
+                int ejectorBlr = BlockRotation.FindRotation(EjectorPrimary, ejectorTarget, EjectorSecondary, EjectorSecondaryTarget);
+                EmitBlock(emittedBlocks, loaderX, -1, loaderZ, "Ejector_1", ejectorBlr);
+                    ReserveEjectorClearanceCell(reservedIntakePositions, loaderX, loaderZ, ejectorTarget);
+            }
+            else
+            {
+                int intakeBlr = BlockRotation.FindRotation(IntakePrimary, Vector3.UnitY, IntakeSecondary, -Vector3.UnitZ);
+                EmitBlock(emittedBlocks, loaderX, -1, loaderZ, "AmmoIntake_1", intakeBlr, GameData.GetAmmoIntakeBlockData(Vector3.UnitY));
+            }
 
             foreach (CellOffset offset in shape.Offsets)
             {
