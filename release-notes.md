@@ -1,6 +1,7 @@
 # Changes
 
-- Added effective autoloader count to solve results
+- Added cooler snake generation and export (Major feature)
+- Added more export options
 
 <!-- install-start -->
 
