@@ -4,6 +4,7 @@ public enum SolverStatus
 {
     Optimal,
     LikelyOptimal,
+    TargetDensityReached,
     TimedOut,
     NoSolution
 }

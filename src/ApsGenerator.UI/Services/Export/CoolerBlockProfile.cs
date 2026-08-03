@@ -1,33 +1,51 @@
+using ApsGenerator.Core.Models;
+
 namespace ApsGenerator.UI.Services.Export;
 
 /// <summary>
-/// Unused for now, will be used for future cooler snake export support
-/// 
-/// Defines the local-space connection profile for a cooler block type.
-/// At BLR=0, these faces are the "connected" (open) faces of the block.
-/// To orient the block, use BlockRotation to find a BLR that maps
-/// these local faces to the desired world faces.
+/// Local-space connection profiles for cooler block variants.
+/// At BLR=0, these faces are the connected (open) faces of the block.
 /// </summary>
 internal static class CoolerBlockProfile
 {
-    // Block IDs
     public const int Cooler4WayId = 228;
     public const int Cooler5WayId = 229;
     public const int CoolerCornerId = 230;
     public const int CoolerSplitterId = 232;
-    public const int CoolerMaterialCost = 50;
 
-    public static readonly Face NonConnectingFace5Way = Face.Forward;
+    private static readonly Face NonConnectingFace5Way = Face.Forward;
 
-    public static readonly Face CornerFace1 = Face.Down;
-    public static readonly Face CornerFace2 = Face.Back;
+    private static readonly Face CornerFace1 = Face.Down;
+    private static readonly Face CornerFace2 = Face.Back;
 
-    public static readonly Face SplitterLateral1 = Face.Left;
-    public static readonly Face SplitterLateral2 = Face.Right;
-    public static readonly Face SplitterBranch = Face.Back;
+    private static readonly Face SplitterLateral1 = Face.Left;
+    private static readonly Face SplitterBranch = Face.Back;
 
-    public static readonly Face FourWayNonConn1 = Face.Forward;
-    public static readonly Face FourWayNonConn2 = Face.Up;
+    private static readonly Face FourWayNonConn1 = Face.Forward;
+    private static readonly Face FourWayNonConn2 = Face.Up;
+
+    /// <summary>
+    /// Map cooler open faces (N,E,S,W) plus vertical links to construct-space <see cref="Face"/> set.
+    /// N,E,S,W ↔ Back,Right,Forward,Left (CoolerCardinals order).
+    /// </summary>
+    public static List<Face> FacesFrom(
+        CoolerFaceFlags open,
+        bool connectUp = false,
+        bool connectDown = false)
+    {
+        var faces = Enumerable.Range(0, CardinalGameFaces.Length)
+            .Where(d => (open & CoolerCardinals.FlagFor(d)) != 0)
+            .Select(d => CardinalGameFaces[d])
+            .ToList();
+
+        if (connectUp) faces.Add(Face.Up);
+        if (connectDown) faces.Add(Face.Down);
+        return faces;
+    }
+
+    /// <summary>Game faces matching CoolerCardinals N,E,S,W order.</summary>
+    private static readonly Face[] CardinalGameFaces =
+        [Face.Back, Face.Right, Face.Forward, Face.Left];
 
     /// <summary>
     /// Selects the appropriate cooler block ID and BLR for a snake cell
@@ -35,6 +53,9 @@ internal static class CoolerBlockProfile
     /// </summary>
     public static (int BlockId, int Blr) SelectBlock(IReadOnlyList<Face> connectedWorldFaces)
     {
+        if (connectedWorldFaces.Any(f => f is Face.Up or Face.Down))
+            return Select5Way(connectedWorldFaces);
+
         int count = connectedWorldFaces.Count;
 
         return count switch
@@ -49,14 +70,13 @@ internal static class CoolerBlockProfile
 
     private static (int BlockId, int Blr) Select5Way(IReadOnlyList<Face> connectedWorldFaces)
     {
-        // Non-connecting face points Down (away from useful connections above)
-        return (Cooler5WayId, BlockRotation.FindRotationOrDefault(NonConnectingFace5Way, Face.Down));
+        Face[] preference = [Face.Down, Face.Up, Face.Forward, Face.Back, Face.Left, Face.Right];
+        Face missing = preference.FirstOrDefault(c => !connectedWorldFaces.Contains(c), Face.Down);
+        return (Cooler5WayId, BlockRotation.FindRotationOrDefault(NonConnectingFace5Way, missing));
     }
 
     private static (int BlockId, int Blr) SelectCorner(Face connectedWorldFace)
     {
-        // Corner at BLR=0 connects Down + Back.
-        // Map Back → neighbor direction, Down → Up (connects toward cooler layers above).
         int blr = BlockRotation.TryFindRotation(CornerFace2, connectedWorldFace, CornerFace1, Face.Up);
         if (blr < 0)
             blr = 0;
@@ -72,8 +92,6 @@ internal static class CoolerBlockProfile
 
         if (isOpposite)
         {
-            // Splitter: straight-through pair + branch pointing Up.
-            // Map splitter's lateral axis to the connected pair, branch → Up.
             int blr = BlockRotation.TryFindRotation(SplitterLateral1, a, SplitterBranch, Face.Up);
             if (blr < 0)
                 blr = BlockRotation.TryFindRotation(SplitterLateral1, b, SplitterBranch, Face.Up);
@@ -83,8 +101,6 @@ internal static class CoolerBlockProfile
             return (CoolerSplitterId, blr);
         }
 
-        // Adjacent pair (90° turn): use 4-way block
-        // Both non-connecting faces (Forward+Up at BLR=0) map to the 2 missing horizontal directions.
         Face nonConn1 = FindMissingLateral(a, b, first: true);
         Face nonConn2 = FindMissingLateral(a, b, first: false);
 
@@ -99,33 +115,15 @@ internal static class CoolerBlockProfile
 
     private static (int BlockId, int Blr) Select3Neighbor(IReadOnlyList<Face> connectedWorldFaces)
     {
-        // 5-way with non-connecting = the missing lateral direction
-        Face missingFace = FindMissingFace(connectedWorldFaces);
-        return (Cooler5WayId, BlockRotation.FindRotationOrDefault(NonConnectingFace5Way, missingFace));
-    }
-
-    private static Face FindMissingFace(IReadOnlyList<Face> connectedFaces)
-    {
         Face[] laterals = [Face.Forward, Face.Back, Face.Right, Face.Left];
-        foreach (Face f in laterals)
-        {
-            if (!connectedFaces.Contains(f))
-                return f;
-        }
-
-        return Face.Down;
+        Face missingFace = laterals.FirstOrDefault(f => !connectedWorldFaces.Contains(f), Face.Down);
+        return (Cooler5WayId, BlockRotation.FindRotationOrDefault(NonConnectingFace5Way, missingFace));
     }
 
     private static Face FindMissingLateral(Face connected1, Face connected2, bool first)
     {
         Face[] laterals = [Face.Forward, Face.Back, Face.Right, Face.Left];
-        var missing = new List<Face>(2);
-        foreach (Face f in laterals)
-        {
-            if (f != connected1 && f != connected2)
-                missing.Add(f);
-        }
-
+        var missing = laterals.Where(f => f != connected1 && f != connected2).ToArray();
         return first ? missing[0] : missing[1];
     }
 }

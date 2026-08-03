@@ -20,6 +20,9 @@ internal static class BlueprintBuilder
 
     private static readonly Vector3 IntakePrimary = Vector3.UnitZ;
     private static readonly Vector3 IntakeSecondary = Vector3.UnitY;
+    private static readonly int BottomAmmoIntakeBlr = BlockRotation.FindRotation(
+        IntakePrimary, Vector3.UnitY, IntakeSecondary, -Vector3.UnitZ);
+    private static readonly string BottomAmmoIntakeData = GameData.GetAmmoIntakeBlockData(Vector3.UnitY);
 
     private static readonly Vector3 EjectorPrimary = Vector3.UnitZ;
     private static readonly Vector3 EjectorSecondary = Vector3.UnitY;
@@ -51,12 +54,76 @@ internal static class BlueprintBuilder
         if (placements.Count > 0)
         {
             if (type == TetrisType.FiveClip)
-                EmitFiveClipBlocks(placements, grid, options.TargetHeight, emittedBlocks);
+                EmitFiveClipExtraLayers(placements, grid, options, emittedBlocks);
             else
-                EmitScaleBasicBlocks(placements, grid, type, options.TargetHeight, options.IncludeEjectors, emittedBlocks);
+                EmitLoaderLengthExtraLayers(placements, grid, type, options, emittedBlocks);
         }
 
         return AssembleBlueprint(options.BlueprintName, options.TargetHeight, emittedBlocks);
+    }
+
+    private static void EmitFiveClipExtraLayers(
+        IReadOnlyList<Placement> placements,
+        Grid grid,
+        ExportOptions options,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
+    {
+        EmitFiveClipBlocks(placements, grid, options.TargetHeight, emittedBlocks);
+        if (options.ExtraLayers != ExportExtraLayers.EjectorsIntakesCoolerSnake)
+            return;
+
+        if (options.CoolerSnakes is { Status: CoolerSnakeStatus.Sat } fiveCooler)
+            ApplyCoolerDeckPlan(grid, options.TargetHeight, fiveCooler, emittedBlocks);
+    }
+
+    /// <summary>
+    /// 3/4-clip path: variable-length loaders/clips, then mutually exclusive extra layers
+    /// from <see cref="ExportExtraLayers"/>. Cooler modes fall back to bottom layer
+    /// when no SAT cooler result is available.
+    /// </summary>
+    private static void EmitLoaderLengthExtraLayers(
+        IReadOnlyList<Placement> placements,
+        Grid grid,
+        TetrisType type,
+        ExportOptions options,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
+    {
+        EmitLoaderLengthLoadersAndClips(placements, grid, type, options.TargetHeight, emittedBlocks);
+
+        CoolerSnakeResult? cooler = options.CoolerSnakes is { Status: CoolerSnakeStatus.Sat } sat
+            ? sat
+            : null;
+
+        switch (options.ExtraLayers)
+        {
+            case ExportExtraLayers.TetrisOnly:
+                return;
+
+            case ExportExtraLayers.EjectorsIntakesCoolerSnake:
+                if (cooler is not null)
+                    ApplyCoolerPlan(grid, options.TargetHeight, cooler, emittedBlocks);
+                else
+                    EmitBottomHardware(placements, grid, type, includeEjectors: true, emittedBlocks);
+                return;
+
+            case ExportExtraLayers.IntakesCoolerSnake:
+                if (cooler is not null)
+                {
+                    EmitBottomAmmoIntakesUnderClusters(placements, grid, type, emittedBlocks);
+                    ApplyCoolerDeckPlan(grid, options.TargetHeight, cooler, emittedBlocks);
+                }
+                else
+                    EmitBottomHardware(placements, grid, type, includeEjectors: false, emittedBlocks);
+                return;
+
+            case ExportExtraLayers.EjectorsIntakes:
+                EmitBottomHardware(placements, grid, type, includeEjectors: true, emittedBlocks);
+                return;
+
+            case ExportExtraLayers.IntakesOnly:
+                EmitBottomHardware(placements, grid, type, includeEjectors: false, emittedBlocks);
+                return;
+        }
     }
 
     private static void ValidateTargetHeight(TetrisType type, int targetHeight)
@@ -73,11 +140,31 @@ internal static class BlueprintBuilder
             throw new ArgumentException($"Target height must be between 1 and 8 for 3-clip and 4-clip exports (got {targetHeight}).");
     }
 
-    private static void EmitScaleBasicBlocks(
+    private static void EmitLoaderLengthLoadersAndClips(
         IReadOnlyList<Placement> placements,
         Grid grid,
         TetrisType type,
         int targetHeight,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
+    {
+        IReadOnlyList<ClusterShape> shapes = ClusterShape.GetShapes(type);
+
+        foreach (Placement placement in placements)
+        {
+            ClusterShape shape = GetShape(shapes, placement, type);
+            CellOffset loaderOffset = GetLoaderOffset(shape);
+            Vector3 loaderTarget = type == TetrisType.ThreeClip
+                ? DetermineOpenDirection(shape)
+                : DefaultLoaderTarget;
+            EmitLoaderLengthLoaderAndClips(
+                placement, shape, loaderOffset, loaderTarget, grid, targetHeight, emittedBlocks);
+        }
+    }
+
+    private static void EmitBottomHardware(
+        IReadOnlyList<Placement> placements,
+        Grid grid,
+        TetrisType type,
         bool includeEjectors,
         Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
     {
@@ -96,10 +183,6 @@ internal static class BlueprintBuilder
             (int loaderX, int loaderZ) = ToGameCoordinates(grid, loaderRow, loaderCol);
             var reservedIntakePositions = new HashSet<(int X, int Z)>();
 
-            string loaderKey = $"Loader_{targetHeight}";
-            int loaderBlr = BlockRotation.FindRotation(LoaderPrimary, loaderTarget, LoaderSecondary, LoaderSecondaryTarget);
-            EmitBlock(emittedBlocks, loaderX, 0, loaderZ, loaderKey, loaderBlr);
-
             if (includeEjectors)
             {
                 Vector3 ejectorTarget = type == TetrisType.ThreeClip
@@ -107,36 +190,212 @@ internal static class BlueprintBuilder
                     : DefaultEjectorTarget;
                 int ejectorBlr = BlockRotation.FindRotation(EjectorPrimary, ejectorTarget, EjectorSecondary, EjectorSecondaryTarget);
                 EmitBlock(emittedBlocks, loaderX, -1, loaderZ, "Ejector_1", ejectorBlr);
-                    ReserveEjectorClearanceCell(reservedIntakePositions, loaderX, loaderZ, ejectorTarget);
-            }
-            else
-            {
-                int intakeBlr = BlockRotation.FindRotation(IntakePrimary, Vector3.UnitY, IntakeSecondary, -Vector3.UnitZ);
-                EmitBlock(emittedBlocks, loaderX, -1, loaderZ, "AmmoIntake_1", intakeBlr, GameData.GetAmmoIntakeBlockData(Vector3.UnitY));
+                reservedIntakePositions.Add((loaderX - (int)ejectorTarget.X, loaderZ + (int)ejectorTarget.Z));
             }
 
-            foreach (CellOffset offset in shape.Offsets)
-            {
-                if (offset.Role != CellRole.Clip)
-                    continue;
-
-                int row = placement.Row + offset.DeltaRow;
-                int col = placement.Col + offset.DeltaCol;
-                (int gameX, int gameZ) = ToGameCoordinates(grid, row, col);
-
-                Vector3 clipDirection = DetermineClipDirection(offset, loaderOffset);
-                string clipKey = $"Clip_{targetHeight}";
-                int clipBlr = BlockRotation.FindRotation(ClipPrimary, clipDirection, ClipSecondary, ClipHorizontalSecondaryTarget);
-                EmitBlock(emittedBlocks, gameX, 0, gameZ, clipKey, clipBlr, GameData.SharedClipBlockData);
-
-                if (!reservedIntakePositions.Contains((gameX, gameZ)))
-                {
-                    int intakeBlr = BlockRotation.FindRotation(IntakePrimary, Vector3.UnitY, IntakeSecondary, -Vector3.UnitZ);
-                    EmitBlock(emittedBlocks, gameX, -1, gameZ, "AmmoIntake_1", intakeBlr,
-                        GameData.GetAmmoIntakeBlockData(Vector3.UnitY));
-                }
-            }
+            EmitClusterBottomIntakes(
+                placement, shape, grid, emittedBlocks,
+                reservedPositions: includeEjectors ? reservedIntakePositions : null,
+                includeLoader: !includeEjectors);
         }
+    }
+
+    /// <summary>
+    /// Emit bottom ammo intakes under loader and/or clip cells of one placement.
+    /// When <paramref name="reservedPositions"/> is set, those XZ cells are skipped (ejector clearance).
+    /// </summary>
+    private static void EmitClusterBottomIntakes(
+        Placement placement,
+        ClusterShape shape,
+        Grid grid,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks,
+        HashSet<(int X, int Z)>? reservedPositions,
+        bool includeLoader)
+    {
+        foreach (CellOffset offset in shape.Offsets)
+        {
+            if (offset.Role == CellRole.Loader)
+            {
+                if (!includeLoader)
+                    continue;
+            }
+            else if (offset.Role != CellRole.Clip)
+            {
+                continue;
+            }
+
+            int row = placement.Row + offset.DeltaRow;
+            int col = placement.Col + offset.DeltaCol;
+            (int gameX, int gameZ) = ToGameCoordinates(grid, row, col);
+            if (reservedPositions is not null && reservedPositions.Contains((gameX, gameZ)))
+                continue;
+
+            EmitBottomAmmoIntake(emittedBlocks, gameX, gameZ);
+        }
+    }
+
+    private static void ApplyCoolerPlan(
+        Grid grid,
+        int targetHeight,
+        CoolerSnakeResult cooler,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
+    {
+        int topY = targetHeight;
+
+        foreach (var ejector in cooler.EjectorDirs)
+            EmitCoolerEjector(grid, ejector, emittedBlocks);
+
+        foreach (var intake in cooler.IntakeCells)
+            EmitCoolerIntake(grid, intake, topY, emittedBlocks);
+
+        ApplyCoolerDeckPlan(grid, topY, cooler, emittedBlocks);
+    }
+
+    private static void EmitCoolerIntake(
+        Grid grid,
+        IntakeCell intake,
+        int topY,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
+    {
+        (int x, int z) = ToGameCoordinates(grid, intake.Row, intake.Col);
+        int y = intake.IsUnderneath ? -1 : topY;
+
+        // Bottom intakes face up into the APS.
+        // Top intakes always face down into the APS (ammo feed). Bridge coolers sit above
+        // and open Down onto the intake body — intake facing does not aim at the cooler.
+        Vector3 intakeFacing = intake.IsUnderneath ? Vector3.UnitY : -Vector3.UnitY;
+        Vector3 intakeSecondaryTarget = intakeFacing.Y > 0 ? -Vector3.UnitZ : Vector3.UnitZ;
+        int intakeBlr = BlockRotation.FindRotation(
+            IntakePrimary, intakeFacing, IntakeSecondary, intakeSecondaryTarget);
+        EmitBlock(
+            emittedBlocks, x, y, z, "AmmoIntake_1", intakeBlr,
+            GameData.GetAmmoIntakeBlockData(intakeFacing));
+    }
+
+    private static void EmitBottomAmmoIntake(
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks,
+        int gameX,
+        int gameZ) =>
+        EmitBlock(emittedBlocks, gameX, -1, gameZ, "AmmoIntake_1", BottomAmmoIntakeBlr, BottomAmmoIntakeData);
+
+    private static void EmitBottomAmmoIntakesUnderClusters(
+        IReadOnlyList<Placement> placements,
+        Grid grid,
+        TetrisType type,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
+    {
+        IReadOnlyList<ClusterShape> shapes = ClusterShape.GetShapes(type);
+
+        foreach (Placement placement in placements)
+        {
+            ClusterShape shape = GetShape(shapes, placement, type);
+            EmitClusterBottomIntakes(
+                placement, shape, grid, emittedBlocks,
+                reservedPositions: null,
+                includeLoader: true);
+        }
+    }
+
+    /// <summary>
+    /// Emits horizontal cooler snake cells on the top deck (and bridge layer when Layer ≥ 1).
+    /// </summary>
+    private static void ApplyCoolerDeckPlan(
+        Grid grid,
+        int topY,
+        CoolerSnakeResult cooler,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
+    {
+        foreach (var cell in cooler.CoolerCells)
+            EmitCoolerDeckCell(grid, cell, topY, emittedBlocks);
+    }
+
+    private static void EmitCoolerDeckCell(
+        Grid grid,
+        CoolerCell cell,
+        int topY,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
+    {
+        (int x, int z) = ToGameCoordinates(grid, cell.Row, cell.Col);
+        var faces = CoolerBlockProfile.FacesFrom(cell.OpenFaces, cell.ConnectUp, cell.ConnectDown);
+        bool onBridge = cell.Layer >= 1;
+        int coolerY = onBridge ? topY + 1 : topY;
+
+        (int blockId, int blr) = CoolerBlockProfile.SelectBlock(faces);
+        string key = blockId switch
+        {
+            CoolerBlockProfile.Cooler4WayId => "Cooler_4Way",
+            CoolerBlockProfile.Cooler5WayId => "Cooler_5Way",
+            CoolerBlockProfile.CoolerCornerId => "Cooler_Corner",
+            CoolerBlockProfile.CoolerSplitterId => "Cooler_Splitter",
+            _ => "Cooler_1",
+        };
+        EmitBlock(emittedBlocks, x, coolerY, z, key, blr);
+    }
+
+    /// <summary>Emits loader + clips at Y=0 for one placement. Returns loader game XZ.</summary>
+    private static (int LoaderX, int LoaderZ) EmitLoaderLengthLoaderAndClips(
+        Placement placement,
+        ClusterShape shape,
+        CellOffset loaderOffset,
+        Vector3 loaderTarget,
+        Grid grid,
+        int targetHeight,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
+    {
+        int loaderRow = placement.Row + loaderOffset.DeltaRow;
+        int loaderCol = placement.Col + loaderOffset.DeltaCol;
+        (int loaderX, int loaderZ) = ToGameCoordinates(grid, loaderRow, loaderCol);
+
+        string loaderKey = $"Loader_{targetHeight}";
+        int loaderBlr = BlockRotation.FindRotation(LoaderPrimary, loaderTarget, LoaderSecondary, LoaderSecondaryTarget);
+        EmitBlock(emittedBlocks, loaderX, 0, loaderZ, loaderKey, loaderBlr);
+
+        foreach (CellOffset offset in shape.Offsets)
+        {
+            if (offset.Role != CellRole.Clip)
+                continue;
+
+            int row = placement.Row + offset.DeltaRow;
+            int col = placement.Col + offset.DeltaCol;
+            (int gameX, int gameZ) = ToGameCoordinates(grid, row, col);
+
+            Vector3 clipDirection = DetermineClipDirection(offset, loaderOffset);
+            string clipKey = $"Clip_{targetHeight}";
+            int clipBlr = BlockRotation.FindRotation(ClipPrimary, clipDirection, ClipSecondary, ClipHorizontalSecondaryTarget);
+            EmitBlock(emittedBlocks, gameX, 0, gameZ, clipKey, clipBlr, GameData.SharedClipBlockData);
+        }
+
+        return (loaderX, loaderZ);
+    }
+
+    private static void EmitCoolerEjector(
+        Grid grid,
+        EjectorPlacement ejector,
+        Dictionary<(int X, int Y, int Z), EmittedBlock> emittedBlocks)
+    {
+        if (ejector.Kind == EjectorKind.None)
+            return;
+
+        if (ejector.Kind == EjectorKind.VerticalOpenArmDown)
+        {
+            (int armX, int armZ) = ToGameCoordinates(grid, ejector.ProtrudeRow, ejector.ProtrudeCol);
+            // Visual nozzle opposite local +Z → aim primary Up so shells go Down.
+            // Local +Y (secondary) aims away from the loader so the connect face points at it.
+            var awayFromLoader = new Vector3(ejector.DCol, 0, ejector.DRow);
+            int blr = BlockRotation.FindRotation(
+                EjectorPrimary, Vector3.UnitY, EjectorSecondary, awayFromLoader);
+            EmitBlock(emittedBlocks, armX, 0, armZ, "Ejector_1", blr);
+            return;
+        }
+
+        // Bottom ejector under the loader: same convention as classic APS export —
+        // primary faces away from the cleared protrusion clip (for 3-clip that is the
+        // open arm when protruding into the stem). Facing the protrusion points into a
+        // neighboring bottom intake and fails to place in-game.
+        (int loaderX, int loaderZ) = ToGameCoordinates(grid, ejector.LoaderRow, ejector.LoaderCol);
+        var target = new Vector3(-ejector.DCol, 0, -ejector.DRow);
+        int bottomBlr = BlockRotation.FindRotation(EjectorPrimary, target, EjectorSecondary, EjectorSecondaryTarget);
+        EmitBlock(emittedBlocks, loaderX, -1, loaderZ, "Ejector_1", bottomBlr);
     }
 
     private static void EmitFiveClipBlocks(
@@ -198,17 +457,6 @@ internal static class BlueprintBuilder
         }
     }
 
-    // Cardinal direction indices: 0=row-1, 1=col+1, 2=row+1, 3=col-1
-    // row-1 = North = Back, col+1 = East = Right, row+1 = South = Forward, col-1 = West = Left
-    private static Face CardinalToFace(int cardinalIndex) => cardinalIndex switch
-    {
-        0 => Face.Back,    // row-1 = North = construct Back
-        1 => Face.Right,   // col+1 = East = construct Right
-        2 => Face.Forward, // row+1 = South = construct Forward
-        3 => Face.Left,    // col-1 = West = construct Left
-        _ => Face.Forward,
-    };
-
     private static ClusterShape GetShape(IReadOnlyList<ClusterShape> shapes, Placement placement, TetrisType type)
     {
         if ((uint)placement.ShapeIndex >= (uint)shapes.Count)
@@ -218,16 +466,8 @@ internal static class BlueprintBuilder
         return shapes[placement.ShapeIndex];
     }
 
-    private static CellOffset GetLoaderOffset(ClusterShape shape)
-    {
-        foreach (CellOffset offset in shape.Offsets)
-        {
-            if (offset.Role == CellRole.Loader)
-                return offset;
-        }
-
-        throw new InvalidOperationException("Cluster shape does not define a loader cell.");
-    }
+    private static CellOffset GetLoaderOffset(ClusterShape shape) =>
+        shape.Offsets.First(o => o.Role == CellRole.Loader);
 
     private static (int X, int Z) ToGameCoordinates(Grid grid, int row, int col)
     {
@@ -254,27 +494,8 @@ internal static class BlueprintBuilder
 
     private static Vector3 DetermineOpenDirection(ClusterShape shape)
     {
-        CellOffset loader = GetLoaderOffset(shape);
-        var occupiedDirections = new HashSet<Vector3>();
-
-        foreach (CellOffset offset in shape.Offsets)
-        {
-            if (offset.Role != CellRole.Clip)
-                continue;
-
-            int deltaRow = offset.DeltaRow - loader.DeltaRow;
-            int deltaCol = offset.DeltaCol - loader.DeltaCol;
-            occupiedDirections.Add(new Vector3(deltaCol, 0, deltaRow));
-        }
-
-        Vector3[] allDirections = [new(0, 0, -1), new(1, 0, 0), new(0, 0, 1), new(-1, 0, 0)];
-        foreach (Vector3 dir in allDirections)
-        {
-            if (!occupiedDirections.Contains(dir))
-                return dir;
-        }
-
-        throw new InvalidOperationException("Unable to determine open direction for 3-clip shape.");
+        var (dRow, dCol) = ClusterOpenArm.Delta(shape);
+        return new Vector3(dCol, 0, dRow);
     }
 
     private static Vector3 DetermineClipDirection(CellOffset fromOffset, CellOffset loaderOffset)
@@ -282,15 +503,6 @@ internal static class BlueprintBuilder
         int deltaRow = loaderOffset.DeltaRow - fromOffset.DeltaRow;
         int deltaCol = loaderOffset.DeltaCol - fromOffset.DeltaCol;
         return new Vector3(deltaCol, 0, deltaRow);
-    }
-
-    private static void ReserveEjectorClearanceCell(
-        HashSet<(int X, int Z)> reservedPositions,
-        int ejectorX,
-        int ejectorZ,
-        Vector3 ejectorTarget)
-    {
-        reservedPositions.Add((ejectorX - (int)ejectorTarget.X, ejectorZ + (int)ejectorTarget.Z));
     }
 
     private static BlueprintFile AssembleBlueprint(
@@ -337,7 +549,10 @@ internal static class BlueprintBuilder
             (int x, int y, int z) = sortedCoordinates[index];
             EmittedBlock emitted = emittedBlocks[(x, y, z)];
 
-            blockPositions.Add(FormatRelativePosition(x, y, z, minX, minY, maxX, maxZ));
+            int relX = x - minX - ((maxX - minX) / 2);
+            int relY = y - minY;
+            int relZ = maxZ - z;
+            blockPositions.Add(string.Create(CultureInfo.InvariantCulture, $"{relX},{relY},{relZ}"));
             blockRotations.Add(emitted.RotationCode);
             blockColorIndices.Add(GameData.DefaultBCI);
             blockIds.Add(emitted.BlockId);
@@ -424,22 +639,6 @@ internal static class BlueprintBuilder
             return guid;
 
         throw new InvalidOperationException($"No item GUID mapping found for block id {blockId}.");
-    }
-
-    private static string FormatRelativePosition(
-        int gameX,
-        int gameY,
-        int gameZ,
-        int minX,
-        int minY,
-        int maxX,
-        int maxZ)
-    {
-        int relX = gameX - minX - ((maxX - minX) / 2);
-        int relY = gameY - minY;
-        int relZ = maxZ - gameZ;
-
-        return string.Create(CultureInfo.InvariantCulture, $"{relX},{relY},{relZ}");
     }
 
     private static void AppendBlockDataSegment(MemoryStream blockDataStream, EmittedBlock emittedBlock, int index)

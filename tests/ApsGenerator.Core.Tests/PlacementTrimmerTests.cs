@@ -1,4 +1,3 @@
-using ApsGenerator.Core;
 using ApsGenerator.Core.Models;
 
 namespace ApsGenerator.Core.Tests;

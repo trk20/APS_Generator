@@ -17,7 +17,8 @@ public sealed record SolverOptions
 
     /// <summary>
     /// Optional target cluster count. If set, solver stops once this many clusters
-    /// are placed, without trying to optimize further. Null means optimize for maximum.
+    /// are placed, without trying to optimize further. The result is marked as
+    /// TargetDensityReached. Null means optimize for maximum.
     /// </summary>
     public int? TargetClusterCount { get; init; }
 

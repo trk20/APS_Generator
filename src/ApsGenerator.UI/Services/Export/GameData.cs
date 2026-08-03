@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Numerics;
 
 namespace ApsGenerator.UI.Services.Export;
@@ -46,6 +45,10 @@ public static class GameData
             ["Ejector_1"] = new("Ejector_1", 231, "", 10),
             ["GaugeIncreaser_1"] = new("GaugeIncreaser_1", 387, "", 20),
             ["Cooler_1"] = new("Cooler_1", 255, "", 50),
+            ["Cooler_4Way"] = new("Cooler_4Way", 228, "", 50),
+            ["Cooler_5Way"] = new("Cooler_5Way", 229, "", 50),
+            ["Cooler_Corner"] = new("Cooler_Corner", 230, "", 50),
+            ["Cooler_Splitter"] = new("Cooler_Splitter", 232, "", 50),
         };
 
     public static readonly IReadOnlyDictionary<int, string> ItemGuids =

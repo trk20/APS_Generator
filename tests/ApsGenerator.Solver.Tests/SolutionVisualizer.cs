@@ -1,6 +1,4 @@
-using ApsGenerator.Core;
 using ApsGenerator.Core.Models;
-using ApsGenerator.Solver;
 using Xunit.Abstractions;
 
 namespace ApsGenerator.Solver.Tests;

@@ -23,6 +23,12 @@ public sealed class UserSettings
 
     public bool EarlyStopEnabled { get; set; } = true;
 
+    /// <summary>After Tetris, solve cooler snakes for 3/4/5-clip (persisted with solver options).</summary>
+    public bool GenerateCoolerSnake { get; set; } = true;
+
+    /// <summary>Show cooler path overlay on the grid (visual only).</summary>
+    public bool ShowCoolerOverlay { get; set; } = true;
+
     public double MaxTimeSeconds { get; set; } = 30;
 
     public bool IsMaximize { get; set; } = true;
@@ -37,13 +43,13 @@ public sealed class UserSettings
 
     public int DefaultExportHeightBasic { get; set; } = 2;
 
-    private int defaultExportHeightFiveClip = FiveClipHeight.MinHeight;
+    public int DefaultExportHeightFiveClip { get; set; } = FiveClipHeight.MinHeight;
 
-    public int DefaultExportHeightFiveClip
-    {
-        get => defaultExportHeightFiveClip;
-        set => defaultExportHeightFiveClip = FiveClipHeight.RoundToMultipleOf3(value);
-    }
+    /// <summary>Persisted extra-layer mode for 3/4-clip exports.</summary>
+    public ExportExtraLayers ExportExtraLayersBasic { get; set; } = ExportExtraLayers.EjectorsIntakesCoolerSnake;
+
+    /// <summary>Persisted extra-layer mode for 5-clip exports (Cooler Snake or Tetris only).</summary>
+    public ExportExtraLayers ExportExtraLayersFiveClip { get; set; } = ExportExtraLayers.EjectorsIntakesCoolerSnake;
 
     public string ExportNameTemplate { get; set; } = DefaultExportNameTemplate;
 

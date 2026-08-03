@@ -63,7 +63,7 @@
                     Background="#1565C0"
                     Foreground="White"
                     CornerRadius="3"
-                    ToolTip.Tip="Update available — click to view release notes">
+                    ToolTip.Tip="Update available: click to view release notes">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <TextBlock Text="⬇" />
                     <TextBlock Text="{Binding UpdateVersionText}" />
@@ -180,7 +180,7 @@
                                 TickFrequency="1"
                                 IsSnapToTickEnabled="True"
                                 Value="{Binding TargetPlacementCount}"
-                                ToolTip.Tip="Target number of pieces to place. Maximum = maximize." />
+                                ToolTip.Tip="Target number of pieces to place." />
 
                         <Separator Margin="0,4" />
 
@@ -189,6 +189,14 @@
                                        Minimum="1" Maximum="50" Increment="1"
                                        FormatString="0" HorizontalAlignment="Stretch" Margin="0,0,0,4"
                                        ToolTip.Tip="Number of solutions to generate" />
+
+                        <StackPanel Orientation="Horizontal" Spacing="8"
+                                    IsVisible="{Binding SupportsCoolerSnakes}"
+                                    ToolTip.Tip="After Tetris, generate a cooler snake to link clusters.">
+                            <TextBlock Text="Generate cooler snake" VerticalAlignment="Center" />
+                            <CheckBox IsChecked="{Binding GenerateCoolerSnake}"
+                                      VerticalAlignment="Center" />
+                        </StackPanel>
 
                         <Button Content="Generate (Ctrl+G)"
                                 Command="{Binding GenerateCommand}"
@@ -203,12 +211,16 @@
                         <ProgressBar IsIndeterminate="True"
                                      IsVisible="{Binding IsGenerating}"
                                      Height="4" />
+                        <ProgressBar IsIndeterminate="True"
+                                     IsVisible="{Binding IsCoolerBusy}"
+                                     Height="4"
+                                     ToolTip.Tip="Generating cooler snake…" />
                     </StackPanel>
                 </HeaderedContentControl>
 
-                <!-- STATUS section (only visible after solve) -->
+                <!-- STATUS section (visible while solving and after) -->
                 <HeaderedContentControl Classes="section" Header="Status"
-                                        IsVisible="{Binding HasSolverRun}">
+                                        IsVisible="{Binding ShowStatusSection}">
                     <StackPanel Spacing="4">
                         <StackPanel Orientation="Horizontal" Spacing="4"
                                     IsVisible="{Binding PlacedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -234,6 +246,13 @@
                                    TextWrapping="Wrap"
                                    Foreground="#F44336"
                                    IsVisible="{Binding StatusDetailText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8"
+                                    IsVisible="{Binding CanToggleCoolerOverlay}"
+                                    ToolTip.Tip="Show or hide the cooler snake on the grid (Ctrl+O).">
+                            <TextBlock Text="Show cooler path" VerticalAlignment="Center" />
+                            <CheckBox IsChecked="{Binding ShowCoolerOverlay}"
+                                      VerticalAlignment="Center" />
+                        </StackPanel>
                     </StackPanel>
                 </HeaderedContentControl>
 
@@ -276,6 +295,8 @@
                                  SolverResult="{Binding SolverResult}"
                                  TetrisType="{Binding SelectedTetrisType.Value}"
                                  SymmetryType="{Binding SelectedSymmetryType.Value}"
+                                 CoolerOverlay="{Binding CoolerResult}"
+                                 ShowCoolerOverlay="{Binding ShowCoolerOverlay}"
                                  />
         </Grid>
 

@@ -39,8 +39,14 @@ public sealed class TetrisSolver
                 if (grid.IsAvailable(r, c))
                     cellList.Add((r, c));
 
-        // Pre-solve
-        int step = GetDescentStep(type);
+        // Pre-solve — descent step equals exclusive footprint size (3-clip=4, 4-clip=5, 5-clip=4).
+        int step = type switch
+        {
+            TetrisType.ThreeClip => 4,
+            TetrisType.FourClip => 5,
+            TetrisType.FiveClip => 4,
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported tetris type.")
+        };
         int remainder = availableCells % step;
 
         double initialRemaining = opts.MaxTimeSeconds - stopwatch.Elapsed.TotalSeconds;
@@ -83,7 +89,7 @@ public sealed class TetrisSolver
 
         if (opts.TargetClusterCount.HasValue && bestClusterCount >= opts.TargetClusterCount.Value)
         {
-            var earlyResult = DecodeModel(bestModel!, placements, shapes, availableCells, SolverStatus.LikelyOptimal);
+            var earlyResult = DecodeModel(bestModel!, placements, shapes, availableCells, SolverStatus.TargetDensityReached);
             if (needMultipleSolutions)
             {
                 earlyResult = BuildTightSolverAndEnumerate(
@@ -135,7 +141,7 @@ public sealed class TetrisSolver
                     int clusterCount = CountClusters(bestModel!, placementCount);
                     if (clusterCount >= opts.TargetClusterCount.Value)
                     {
-                        var earlyResult = DecodeModel(bestModel!, placements, shapes, availableCells, SolverStatus.LikelyOptimal);
+                        var earlyResult = DecodeModel(bestModel!, placements, shapes, availableCells, SolverStatus.TargetDensityReached);
                         if (needMultipleSolutions)
                         {
                             retainedBoundSolver?.Dispose();
@@ -392,7 +398,7 @@ public sealed class TetrisSolver
                 exclusiveCoverageMap,
                 ref nextVar);
 
-            BuildPermanentAmkConstraint(solver, uncoveredLits, bound, ref nextVar);
+            SatCardinality.AddAtMostK(solver, uncoveredLits, bound, ref nextVar);
 
             solver.SetMaxTime(remainingSeconds * options.MaxThreads);
 
@@ -445,55 +451,26 @@ public sealed class TetrisSolver
             options.SymmetryType, options.SymmetryMode);
     }
 
-    /// <summary>
-    /// Descent step equals exclusive footprint size:
-    /// 3-clip = 4, 4-clip = 5, 5-clip = 4.
-    /// Connector sharing does not affect this because objective coverage is exclusive-only.
-    /// </summary>
-    private static int GetDescentStep(TetrisType type) => type switch
-    {
-        TetrisType.ThreeClip => 4,
-        TetrisType.FourClip => 5,
-        TetrisType.FiveClip => 4,
-        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported tetris type.")
-    };
-
     private static int GetNextBound(int bestEmpty, int remainder, int step)
     {
         // Uncovered cells must remain in same congruence class modulo step.
-        int alignedBestEmpty = AlignDownToResidue(bestEmpty, remainder, step);
-        int nextBound = alignedBestEmpty - step;
-        return nextBound >= 0 ? nextBound : -1;
-    }
-
-    private static int AlignDownToResidue(int value, int remainder, int step)
-    {
-        int residue = value % step;
+        int residue = bestEmpty % step;
         int delta = residue - remainder;
         if (delta < 0)
             delta += step;
 
-        return value - delta;
+        int alignedBestEmpty = bestEmpty - delta;
+        int nextBound = alignedBestEmpty - step;
+        return nextBound >= 0 ? nextBound : -1;
     }
 
     private static int CountEmptyCells(bool?[] model, List<Placement> placements,
         IReadOnlyList<ClusterShape> shapes, int availableCells)
     {
-        var coveredCells = new HashSet<(int, int)>();
-        for (int i = 0; i < placements.Count; i++)
-        {
-            if (model[i] != true) continue;
-            var p = placements[i];
-            var offsets = shapes[p.ShapeIndex].Offsets;
-            for (int j = 0; j < offsets.Count; j++)
-            {
-                if (offsets[j].Role == CellRole.Connection)
-                    continue;
-
-                coveredCells.Add((p.Row + offsets[j].DeltaRow, p.Col + offsets[j].DeltaCol));
-            }
-        }
-        return availableCells - coveredCells.Count;
+        IEnumerable<Placement> selected = Enumerable.Range(0, placements.Count)
+            .Where(i => model[i] == true)
+            .Select(i => placements[i]);
+        return PlacementCoverage.EmptyExclusiveCellCount(selected, shapes, availableCells);
     }
 
     private static int CountClusters(bool?[] model, int placementCount)
@@ -594,12 +571,12 @@ public sealed class TetrisSolver
             if (n > 1 && n <= PairwiseAmoThreshold)
             {
                 for (int i = 0; i < n; i++)
-                for (int j = i + 1; j < n; j++)
-                {
-                    int litA = -(exclusiveList[i] + 1);
-                    int litB = -(exclusiveList[j] + 1);
-                    solver.AddClause([litA, litB]);
-                }
+                    for (int j = i + 1; j < n; j++)
+                    {
+                        int litA = -(exclusiveList[i] + 1);
+                        int litB = -(exclusiveList[j] + 1);
+                        solver.AddClause([litA, litB]);
+                    }
             }
             else if (n > PairwiseAmoThreshold)
             {
@@ -635,78 +612,14 @@ public sealed class TetrisSolver
             if (connectionMap.TryGetValue(cell, out var connList))
             {
                 for (int i = 0; i < exclusiveList.Count; i++)
-                for (int j = 0; j < connList.Count; j++)
-                {
-                    int litE = -(exclusiveList[i] + 1);
-                    int litC = -(connList[j] + 1);
-                    solver.AddClause([litE, litC]);
-                }
+                    for (int j = 0; j < connList.Count; j++)
+                    {
+                        int litE = -(exclusiveList[i] + 1);
+                        int litC = -(connList[j] + 1);
+                        solver.AddClause([litE, litC]);
+                    }
             }
         }
-    }
-
-    private static void BuildPermanentAmkConstraint(
-        SatSolver solver,
-        ReadOnlySpan<int> literals,
-        int maxTrue,
-        ref int nextVar)
-    {
-        int inputCount = literals.Length;
-
-        if (maxTrue < 0)
-        {
-            solver.AddVariables(1);
-            int contradictionLit = nextVar + 1;
-            nextVar++;
-            solver.AddClause([contradictionLit]);
-            solver.AddClause([-contradictionLit]);
-            return;
-        }
-
-        if (inputCount <= 1 || maxTrue >= inputCount)
-            return;
-
-        if (maxTrue == 0)
-        {
-            for (int i = 0; i < inputCount; i++)
-                solver.AddClause([-literals[i]]);
-            return;
-        }
-
-        int[,] s = new int[inputCount - 1, maxTrue];
-        int auxVarCount = (inputCount - 1) * maxTrue;
-        solver.AddVariables(auxVarCount);
-
-        for (int i = 0; i < inputCount - 1; i++)
-        for (int j = 0; j < maxTrue; j++)
-        {
-            s[i, j] = nextVar + 1;
-            nextVar++;
-        }
-
-        // Base row (i = 0)
-        solver.AddClause([-literals[0], s[0, 0]]);
-        for (int j = 1; j < maxTrue; j++)
-            solver.AddClause([-s[0, j]]);
-
-        // 0 < i < n - 1
-        for (int i = 1; i < inputCount - 1; i++)
-        {
-            solver.AddClause([-literals[i], s[i, 0]]);
-            solver.AddClause([-s[i - 1, 0], s[i, 0]]);
-
-            for (int j = 1; j < maxTrue; j++)
-            {
-                solver.AddClause([-literals[i], -s[i - 1, j - 1], s[i, j]]);
-                solver.AddClause([-s[i - 1, j], s[i, j]]);
-            }
-
-            // Overflow for this row
-            solver.AddClause([-literals[i], -s[i - 1, maxTrue - 1]]);
-        }
-
-        // Overflow for last input
-        solver.AddClause([-literals[inputCount - 1], -s[inputCount - 2, maxTrue - 1]]);
     }
 
     private static SolverResult DecodeModel(
@@ -891,11 +804,11 @@ public sealed class TetrisSolver
         }
 
         for (int a = 0; a < orbit.Count; a++)
-        for (int b = a + 1; b < orbit.Count; b++)
-        {
-            if (cellSets[a].Overlaps(cellSets[b]))
-                return true;
-        }
+            for (int b = a + 1; b < orbit.Count; b++)
+            {
+                if (cellSets[a].Overlaps(cellSets[b]))
+                    return true;
+            }
 
         return false;
     }
@@ -950,7 +863,11 @@ public sealed class TetrisSolver
         int newC = grid.Width - 1 - c;
         int newSi = type == TetrisType.FourClip ? 0 : shapeIndex switch
         {
-            0 => 2, 2 => 0, 1 => 3, 3 => 1, _ => shapeIndex
+            0 => 2,
+            2 => 0,
+            1 => 3,
+            3 => 1,
+            _ => shapeIndex
         };
         return (newR, newC, newSi);
     }
@@ -963,7 +880,11 @@ public sealed class TetrisSolver
         int newC = grid.Height - 1 - r;
         int newSi = type == TetrisType.FourClip ? 0 : shapeIndex switch
         {
-            0 => 1, 1 => 2, 2 => 3, 3 => 0, _ => shapeIndex
+            0 => 1,
+            1 => 2,
+            2 => 3,
+            3 => 0,
+            _ => shapeIndex
         };
         return (newR, newC, newSi);
     }
@@ -976,7 +897,11 @@ public sealed class TetrisSolver
         int newC = r;
         int newSi = type == TetrisType.FourClip ? 0 : shapeIndex switch
         {
-            0 => 3, 3 => 2, 2 => 1, 1 => 0, _ => shapeIndex
+            0 => 3,
+            3 => 2,
+            2 => 1,
+            1 => 0,
+            _ => shapeIndex
         };
         return (newR, newC, newSi);
     }
