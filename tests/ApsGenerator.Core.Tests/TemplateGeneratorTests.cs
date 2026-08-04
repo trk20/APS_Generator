@@ -1,4 +1,3 @@
-using ApsGenerator.Core;
 using ApsGenerator.Core.Models;
 
 namespace ApsGenerator.Core.Tests;
@@ -36,14 +35,14 @@ public sealed class TemplateGeneratorTests
         Assert.Equal(CellState.Blocked, grid[center, center]);
 
         for (int row = 0; row < diameter; row++)
-        for (int col = 0; col < diameter; col++)
-        {
-            var expected = IsBlockedByCircleFormula(diameter, row, col, blockCenter: true)
-                ? CellState.Blocked
-                : CellState.Available;
+            for (int col = 0; col < diameter; col++)
+            {
+                var expected = IsBlockedByCircleFormula(diameter, row, col, blockCenter: true)
+                    ? CellState.Blocked
+                    : CellState.Available;
 
-            Assert.Equal(expected, grid[row, col]);
-        }
+                Assert.Equal(expected, grid[row, col]);
+            }
     }
 
     [Fact]
@@ -63,16 +62,16 @@ public sealed class TemplateGeneratorTests
         var grid = TemplateGenerator.Circle(diameter, blockCenter: true);
 
         for (int row = 0; row < grid.Height; row++)
-        for (int col = 0; col < grid.Width; col++)
-        {
-            int symmetricRow = grid.Height - 1 - row;
-            int symmetricCol = grid.Width - 1 - col;
+            for (int col = 0; col < grid.Width; col++)
+            {
+                int symmetricRow = grid.Height - 1 - row;
+                int symmetricCol = grid.Width - 1 - col;
 
-            bool isBlocked = grid[row, col] == CellState.Blocked;
-            bool symmetricIsBlocked = grid[symmetricRow, symmetricCol] == CellState.Blocked;
+                bool isBlocked = grid[row, col] == CellState.Blocked;
+                bool symmetricIsBlocked = grid[symmetricRow, symmetricCol] == CellState.Blocked;
 
-            Assert.Equal(isBlocked, symmetricIsBlocked);
-        }
+                Assert.Equal(isBlocked, symmetricIsBlocked);
+            }
     }
 
     private static int CountExpectedCircleAvailable(int diameter, bool blockCenter)
@@ -80,11 +79,11 @@ public sealed class TemplateGeneratorTests
         int available = 0;
 
         for (int row = 0; row < diameter; row++)
-        for (int col = 0; col < diameter; col++)
-        {
-            if (!IsBlockedByCircleFormula(diameter, row, col, blockCenter))
-                available++;
-        }
+            for (int col = 0; col < diameter; col++)
+            {
+                if (!IsBlockedByCircleFormula(diameter, row, col, blockCenter))
+                    available++;
+            }
 
         return available;
     }

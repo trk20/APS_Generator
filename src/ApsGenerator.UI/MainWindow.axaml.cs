@@ -16,8 +16,7 @@ public partial class MainWindow : Window
         Closing += OnClosing;
 
         gridCanvas = this.FindControl<GridCanvas>("GridCanvas");
-        if (gridCanvas is not null)
-            gridCanvas.CellClicked += OnCellClicked;
+        gridCanvas?.CellClicked += OnCellClicked;
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -71,23 +70,29 @@ public partial class MainWindow : Window
         if (vm.SolverResult is null || vm.SolverResult.Placements.Count == 0)
             return;
 
+        var tetrisType = vm.SelectedTetrisType.Value;
         var dialog = new ExportDialog(
             vm.SolverResult,
             vm.Grid,
-            vm.SelectedTetrisType.Value,
+            tetrisType,
             vm.LastExportFolder,
+            vm.CoolerSession,
             vm.DefaultExportHeightBasic,
             vm.DefaultExportHeightFiveClip,
-            vm.ExportNameTemplate);
+            vm.ExportNameTemplate,
+            vm.ThreadCount,
+            maxTimeSeconds: vm.MaxTimeSeconds,
+            extraLayers: vm.ExportExtraLayersFor(tetrisType));
 
         var exported = await dialog.ShowDialog<bool>(this);
         if (exported)
         {
-            if (dialog.Tag is string folder)
-            {
+            if (dialog.ExportedFolder is string folder)
                 vm.LastExportFolder = folder;
-                UserSettingsStore.Save(vm.CreateUserSettings());
-            }
+
+            vm.SetExportExtraLayersFor(tetrisType, dialog.ExportedExtraLayers);
+
+            UserSettingsStore.Save(vm.CreateUserSettings());
 
             vm.StatusLabel = "Exported";
             vm.StatusDetailText = "";
@@ -106,8 +111,9 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainWindowViewModel viewModel)
         {
-            // Order: cancel in-flight solve, then persist settings, then close.
+            // Order: cancel Tetris + cooler, persist settings, dispose cooler session.
             viewModel.CancelCommand.Execute(null);
+            viewModel.DisposeCoolerSession();
             UserSettingsStore.Save(viewModel.CreateUserSettings());
         }
     }

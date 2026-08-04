@@ -1,6 +1,5 @@
 using ApsGenerator.Core;
 using ApsGenerator.Core.Models;
-using ApsGenerator.Solver;
 using Xunit.Abstractions;
 
 namespace ApsGenerator.Solver.Tests;
@@ -141,6 +140,7 @@ public sealed class TetrisSolverTests
 
         AssertSolutionValid(grid, TetrisType.ThreeClip, result);
         Assert.True(result.ClusterCount >= 40);
+        Assert.Equal(SolverStatus.TargetDensityReached, result.Status);
     }
 
     [Fact]
@@ -153,6 +153,7 @@ public sealed class TetrisSolverTests
 
         AssertSolutionValid(grid, TetrisType.FourClip, result);
         Assert.True(result.ClusterCount >= 10);
+        Assert.Equal(SolverStatus.TargetDensityReached, result.Status);
     }
 
     private static void AssertSolutionValid(Grid grid, TetrisType type, SolverResult result)
@@ -241,8 +242,8 @@ public sealed class TetrisSolverTests
         var grid = TemplateGenerator.Rectangle(width, height);
 
         for (int row = 0; row < grid.Height; row++)
-        for (int col = 0; col < grid.Width; col++)
-            grid[row, col] = CellState.Blocked;
+            for (int col = 0; col < grid.Width; col++)
+                grid[row, col] = CellState.Blocked;
 
         return grid;
     }
@@ -978,15 +979,15 @@ public sealed class TetrisSolverTests
 
         // All solutions are pairwise distinct
         for (int a = 0; a < result.AllSolutions.Count; a++)
-        for (int b = a + 1; b < result.AllSolutions.Count; b++)
-        {
-            var setA = new HashSet<(int, int, int)>(
-                result.AllSolutions[a].Select(p => (p.Row, p.Col, p.ShapeIndex)));
-            var setB = new HashSet<(int, int, int)>(
-                result.AllSolutions[b].Select(p => (p.Row, p.Col, p.ShapeIndex)));
+            for (int b = a + 1; b < result.AllSolutions.Count; b++)
+            {
+                var setA = new HashSet<(int, int, int)>(
+                    result.AllSolutions[a].Select(p => (p.Row, p.Col, p.ShapeIndex)));
+                var setB = new HashSet<(int, int, int)>(
+                    result.AllSolutions[b].Select(p => (p.Row, p.Col, p.ShapeIndex)));
 
-            Assert.False(setA.SetEquals(setB), $"Solutions {a} and {b} are identical");
-        }
+                Assert.False(setA.SetEquals(setB), $"Solutions {a} and {b} are identical");
+            }
     }
 
     [Fact]

@@ -14,16 +14,11 @@ This tool provides a simple, user-friendly method to easily generate density-opt
 - Automatic turret layout templates (circle with/without center hole, rectangle, or fully custom).
 - **Hard and soft symmetry** enforcement - rotational (90°/180°) and reflexive (vertical/horizontal/quadrants).
 - **Blueprint file export** - export generated layouts directly to `.blueprint` prefab files for immediate use in-game, including bottom layer of ejectors and ammo intakes. Choose the resulting prefab height, mapped automatically to the respective blocks, and get total material cost and block count before exporting.
-
-## New in version 2.0
-
+- **Cooler snake generation** - automatically generate a cooler snake to connect loaders while ensuring the correct number of intakes.
 - **Template cell painting** - use click-and-drag to paint blocked or clear cells for custom templates. Painting follows symmetry rules if enabled.
 - **Multi-solution generation** - generate multiple distinct solutions for the same template.
 - **Selectable target density** - choose a desired density target to have the solver aim for, instead of just the optimal solution.
 - **Experimental early stop heuristic** for faster solving (trades a small amount of optimality for significantly reduced solve time in some cases).
-- **Fixes for 5-clip and rotational symmetry** - 5-clip now properly optimizes for maximum loaders/clips, and rotational symmetry (especially 90°) is actually rotationally symmetric.
-- **Max time limit and cancellation** - set a maximum time limit for solving, and cancel long-running solves if you notice a mistake in your parameters.
-- **Persistent settings** - settings are now saved and loaded from a config file in the app data folder.
 
 ---
 
@@ -107,6 +102,11 @@ Cells follow symmetry rules if enabled.
 | Soft Symmetry             | ![soft-result](readme-images/soft-symmetry.png)      |
 
 - **Number of Solutions** - Set how many distinct solutions the solver should generate before stopping. The solver will attempt to find multiple unique layouts that meet the specified parameters (note - this is significantly faster than generating multiple times, around ~50% extra time for 10 solutions instead of 1). After generating, you can cycle through the different solutions using the left and right arrow buttons above the result display. If less unique solutions exist than the number requested, the solver will return all unique solutions.
+- **Show Cooler Snake** - toggle the visibility of the cooler snake on the grid.
+
+![cooler-snake](readme-images/cooler-snake.png)
+
+> Note: cooler snake generation is an early feature and often lacks redundancy in the path - it is recommended to tweak it once in-game.
 
 ## Additional Settings
 
@@ -144,6 +144,7 @@ Statuses include:
 
 - **Optimal** - The solver proved that the solution is optimal.
 - **Likely Optimal** - The early stop heuristic was triggered, so the solver stopped before proving optimality. Small chance that a better solution exists.
+- **Density Target Met** - The solver found a solution that meets the specified target density.
 - **Timed Out** - The solver exceeded the maximum time limit. The best solution found so far is returned, but it may not be optimal.
 - **Cancelled** - The solve was cancelled prematurely by the user and no solution was returned.
 
@@ -153,7 +154,7 @@ When a solution is ready, press the **Export Blueprint** button to open the expo
 
 ![export-blueprint](readme-images/export-blueprint.png)
 
-The export dialog shows total material cost. Select the clip/loader length for 3/4-clip or stack height for 5-clip, change the export name from the default template if you want, and press Export to save the `.blueprint` file. If this is the first time you're exporting, you may want to set the Save Location to your FTD prefab folder so the file is saved in the correct location for immediate use in-game (press browse and navigate to your FTD prefab folder).
+The export dialog shows total material cost. Select the clip/loader length for 3/4-clip or stack height for 5-clip, change the export name from the default template if you want, select what additional layers to include, and press Export to save the `.blueprint` file. If this is the first time you're exporting, you may want to set the Save Location to your FTD prefab folder so the file is saved in the correct location for immediate use in-game (press browse and navigate to your FTD prefab folder).
 
 `…/From The Depths/Player Profiles/{username}/PrefabsVersion2/`
 

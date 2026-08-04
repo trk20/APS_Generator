@@ -36,6 +36,12 @@ public sealed class GridCanvas : Control
     public static readonly StyledProperty<PaintMode> PaintModeProperty =
         AvaloniaProperty.Register<GridCanvas, PaintMode>(nameof(PaintMode), PaintMode.Block);
 
+    public static readonly StyledProperty<CoolerSnakeResult?> CoolerOverlayProperty =
+        AvaloniaProperty.Register<GridCanvas, CoolerSnakeResult?>(nameof(CoolerOverlay));
+
+    public static readonly StyledProperty<bool> ShowCoolerOverlayProperty =
+        AvaloniaProperty.Register<GridCanvas, bool>(nameof(ShowCoolerOverlay));
+
     private static readonly SolidColorBrush BlockedBrush = new(Color.Parse("#000000"));
     private static readonly SolidColorBrush AvailableBrush = new(Color.Parse("#FFFFFF"));
     private static readonly Pen GridLinePen = new(new SolidColorBrush(Color.Parse("#9E9E9E")), 0.5);
@@ -64,12 +70,21 @@ public sealed class GridCanvas : Control
         Color.Parse("#C0CA33")
     ];
 
+    private readonly CoolerOverlayRenderer coolerOverlayRenderer = new();
+
     static GridCanvas()
     {
         GridProperty.Changed.AddClassHandler<GridCanvas>((canvas, _) => canvas.HandleGridChanged());
         SolverResultProperty.Changed.AddClassHandler<GridCanvas>((canvas, _) => canvas.InvalidateVisual());
         TetrisTypeProperty.Changed.AddClassHandler<GridCanvas>((canvas, _) => canvas.InvalidateVisual());
         SymmetryTypeProperty.Changed.AddClassHandler<GridCanvas>((canvas, _) => canvas.InvalidateVisual());
+        CoolerOverlayProperty.Changed.AddClassHandler<GridCanvas>((canvas, _) => canvas.InvalidateVisual());
+        ShowCoolerOverlayProperty.Changed.AddClassHandler<GridCanvas>((canvas, _) => canvas.InvalidateVisual());
+    }
+
+    public GridCanvas()
+    {
+        RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.None);
     }
 
     public GridModel? Grid
@@ -100,6 +115,18 @@ public sealed class GridCanvas : Control
     {
         get => GetValue(PaintModeProperty);
         set => SetValue(PaintModeProperty, value);
+    }
+
+    public CoolerSnakeResult? CoolerOverlay
+    {
+        get => GetValue(CoolerOverlayProperty);
+        set => SetValue(CoolerOverlayProperty, value);
+    }
+
+    public bool ShowCoolerOverlay
+    {
+        get => GetValue(ShowCoolerOverlayProperty);
+        set => SetValue(ShowCoolerOverlayProperty, value);
     }
 
     private bool isPainting;
@@ -139,6 +166,9 @@ public sealed class GridCanvas : Control
 
         DrawGridLines(context, grid, cellSize, originX, originY, renderWidth, renderHeight);
         DrawSymmetryIndicators(context, cellSize, originX, originY, renderWidth, renderHeight);
+
+        if (ShowCoolerOverlay && CoolerOverlay is { } coolerOverlay)
+            coolerOverlayRenderer.Draw(context, grid, coolerOverlay, cellSize, originX, originY, CellRect);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)

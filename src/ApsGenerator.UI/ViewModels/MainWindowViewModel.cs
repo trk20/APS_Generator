@@ -1,6 +1,7 @@
 using ApsGenerator.Core;
 using ApsGenerator.Core.Models;
 using ApsGenerator.Solver;
+using ApsGenerator.Solver.Cooler;
 using ApsGenerator.UI.Models;
 using ApsGenerator.UI.Services;
 using Avalonia.Media;
@@ -13,11 +14,6 @@ namespace ApsGenerator.UI.ViewModels;
 
 public partial class MainWindowViewModel : ObservableObject
 {
-    private const int MinTemplateDimension = 3;
-    private const int MaxTemplateDimension = 50;
-    private const double MinSolverSeconds = 1;
-    private const double MaxSolverSeconds = 600;
-
     private static readonly IBrush DefaultStatusBrush = new SolidColorBrush(Color.Parse("#9E9E9E"));
     private static readonly IBrush OptimalBrush = new SolidColorBrush(Color.Parse("#4CAF50"));
     private static readonly IBrush LikelyOptimalBrush = new SolidColorBrush(Color.Parse("#8BC34A"));
@@ -26,70 +22,51 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private EnumDisplayItem<UiTemplateShape> templateShape = TemplateShapeValues.All[1];
-
     [ObservableProperty]
     private int templateWidth = 15;
-
     [ObservableProperty]
     private int templateHeight = 15;
-
     [ObservableProperty]
     private bool isHeightLocked = true;
-
     [ObservableProperty]
     private PaintMode paintMode = PaintMode.Block;
-
     [ObservableProperty]
     private EnumDisplayItem<TetrisType> selectedTetrisType = EnumValues.TetrisTypes[0];
-
     [ObservableProperty]
     private EnumDisplayItem<SymmetryType> selectedSymmetryType = EnumValues.SymmetryTypes[0];
-
     [ObservableProperty]
     private bool isHardSymmetry = true;
-
     [ObservableProperty]
     private double maxTimeSeconds = 30;
-
     [ObservableProperty]
     private double uiScale = 1.0;
-
     [ObservableProperty]
     private bool autoUpdate = true;
-
     [ObservableProperty]
     private bool receiveExperimentalUpdates;
-
     [ObservableProperty]
     private bool showReleaseNotesAfterUpdate = true;
-
     [ObservableProperty]
     private bool updateAvailable;
-
     [ObservableProperty]
     private string updateVersionText = "";
 
     public string? PendingReleaseNotesVersion { get; set; }
-
     public string? PendingReleaseNotesContent { get; set; }
-
     public string? LastSeenUpdateVersion { get; set; }
 
     [ObservableProperty]
     private bool earlyStopEnabled = true;
-
+    [ObservableProperty]
+    private bool generateCoolerSnake = true;
     [ObservableProperty]
     private int targetPlacementCount;
-
     [ObservableProperty]
     private int maxPlacements;
-
     [ObservableProperty]
     private bool isGenerating;
-
     [ObservableProperty]
     private Grid grid = TemplateGenerator.Circle(15, true);
-
     [ObservableProperty]
     private SolverResult? solverResult;
 
@@ -106,15 +83,15 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool hasSolverRun;
 
+    /// <summary>Status panel shows during an active solve (wall-clock) and after.</summary>
+    public bool ShowStatusSection => HasSolverRun || IsGenerating;
+
     [ObservableProperty]
     private string statusLabel = "Ready";
-
     [ObservableProperty]
     private string statusDetailText = "";
-
     [ObservableProperty]
     private string elapsedTimeText = "";
-
     [ObservableProperty]
     private IBrush statusForeground = DefaultStatusBrush;
 
@@ -131,10 +108,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool canExport;
-
     [ObservableProperty]
     private int numSolutions = 1;
-
     [ObservableProperty]
     private int currentSolutionIndex;
 
@@ -147,6 +122,40 @@ public partial class MainWindowViewModel : ObservableObject
 
     public bool HasMultipleSolutions => allTrimmedSolutions.Count > 1;
 
+    [ObservableProperty]
+    private bool showCoolerOverlay = true;
+
+    /// <summary>Tetris types that support cooler-snake generation.</summary>
+    public bool SupportsCoolerSnakes => SelectedTetrisType.Value.SupportsCoolerSnakes();
+
+    /// <summary>Visual overlay toggle — only when a cooler solve is applicable / in progress.</summary>
+    public bool CanToggleCoolerOverlay =>
+        GenerateCoolerSnake
+        && SupportsCoolerSnakes
+        && HasSolverRun
+        && SolverResult is { Placements.Count: > 0 };
+
+    public CoolerSnakeResult? CoolerResult => coolerSession.Result;
+    public bool IsCoolerBusy => coolerSession.IsBusy;
+
+    public ExportExtraLayers ExportExtraLayersFor(TetrisType type) =>
+        type == TetrisType.FiveClip
+            ? ExportExtraLayersFiveClip.ClampFor(TetrisType.FiveClip)
+            : ExportExtraLayersBasic;
+
+    public void SetExportExtraLayersFor(TetrisType type, ExportExtraLayers layers)
+    {
+        if (type == TetrisType.FiveClip)
+            ExportExtraLayersFiveClip = layers.ClampFor(TetrisType.FiveClip);
+        else
+            ExportExtraLayersBasic = layers;
+    }
+
+    /// <summary>Shared cooler solve session (overlay + export cache).</summary>
+    public CoolerSolveSession CoolerSession => coolerSession;
+
+    private readonly CoolerSolveSession coolerSession;
+
     partial void OnSolverResultChanged(SolverResult? value)
     {
         if (value is null)
@@ -156,47 +165,42 @@ public partial class MainWindowViewModel : ObservableObject
             OnPropertyChanged(nameof(HasMultipleSolutions));
             OnPropertyChanged(nameof(SolutionCounterText));
         }
+
+        coolerSession.ClearResult();
+        OnPropertyChanged(nameof(CoolerResult));
+        NotifyCoolerAvailabilityChanged();
+        coolerSession.ScheduleOverlaySolve();
     }
 
     [ObservableProperty]
     private int threadCount = Math.Max(1, Environment.ProcessorCount - 1);
-
     [ObservableProperty]
     private int defaultExportHeightBasic = 2;
-
     [ObservableProperty]
     private int defaultExportHeightFiveClip = 3;
-
+    [ObservableProperty]
+    private ExportExtraLayers exportExtraLayersBasic = ExportExtraLayers.EjectorsIntakesCoolerSnake;
+    [ObservableProperty]
+    private ExportExtraLayers exportExtraLayersFiveClip = ExportExtraLayers.EjectorsIntakesCoolerSnake;
     [ObservableProperty]
     private string exportNameTemplate = UserSettings.DefaultExportNameTemplate;
 
     public int MaxThreadCount => Math.Max(1, Environment.ProcessorCount - 1);
 
     public Func<string, Task<bool>>? ConfirmAsync { get; set; }
-
     public Func<Task>? ShowExportDialogAsync { get; set; }
-
     public Func<Task>? ShowPendingReleaseNotes { get; set; }
-
     public Func<Task>? ApplyPendingUpdate { get; set; }
-
     public Action<double>? ScaleChanged { get; set; }
 
     public int SliderMaximum => MaxPlacements;
-
     public int SliderMinimum => MaxPlacements / 3;
-
     public bool IsHeightEditable => TemplateShape.Value == UiTemplateShape.Rectangle && !IsHeightLocked;
-
     public bool IsLockButtonEnabled => TemplateShape.Value == UiTemplateShape.Rectangle;
-
     public bool IsSymmetryEnabled => SelectedSymmetryType.Value != SymmetryType.None;
-
     public bool IsMaximize => MaxPlacements > 0 && TargetPlacementCount >= MaxPlacements;
-
     public bool IsRotation90NonSquareWarning =>
         SelectedSymmetryType.Value == SymmetryType.Rotation90 && Grid.Width != Grid.Height;
-
     public bool IsPaintModeBlock => PaintMode == PaintMode.Block;
     public bool IsPaintModeClear => PaintMode == PaintMode.Clear;
     public bool IsPaintModeToggle => PaintMode == PaintMode.Toggle;
@@ -217,41 +221,58 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     public MainWindowViewModel()
+        : this(new CoolerSnakeSolver())
     {
+    }
+
+    public MainWindowViewModel(CoolerSnakeSolver coolerSolver)
+    {
+        ArgumentNullException.ThrowIfNull(coolerSolver);
+        coolerSession = new CoolerSolveSession(coolerSolver);
+        coolerSession.StateChanged += OnCoolerSessionStateChanged;
+        coolerSession.ConfigureOverlay(BuildOverlayRequest);
+
         suppressRegenerate = true;
         ApplyUserSettings(UserSettingsStore.Load());
         suppressRegenerate = false;
         RegenerateGrid();
     }
 
-    public UserSettings CreateUserSettings() => new()
+    private CoolerOverlaySolveRequest? BuildOverlayRequest()
     {
-        TemplateShape = TemplateShape.Value,
-        TemplateWidth = TemplateWidth,
-        TemplateHeight = TemplateHeight,
-        IsHeightLocked = IsHeightLocked,
-        SelectedTetrisType = SelectedTetrisType.Value,
-        SelectedSymmetryType = SelectedSymmetryType.Value,
-        IsHardSymmetry = IsHardSymmetry,
-        EarlyStopEnabled = EarlyStopEnabled,
-        MaxTimeSeconds = MaxTimeSeconds,
-        IsMaximize = IsMaximize,
-        TargetPlacementCount = TargetPlacementCount,
-        PaintMode = PaintMode,
-        LastExportFolder = LastExportFolder,
-        ThreadCount = ThreadCount,
-        DefaultExportHeightBasic = DefaultExportHeightBasic,
-        DefaultExportHeightFiveClip = DefaultExportHeightFiveClip,
-        ExportNameTemplate = ExportNameTemplate,
-        NumSolutions = NumSolutions,
-        UiScale = UiScale,
-        AutoUpdate = AutoUpdate,
-        ReceiveExperimentalUpdates = ReceiveExperimentalUpdates,
-        ShowReleaseNotesAfterUpdate = ShowReleaseNotesAfterUpdate,
-        PendingReleaseNotesVersion = PendingReleaseNotesVersion,
-        PendingReleaseNotesContent = PendingReleaseNotesContent,
-        LastSeenUpdateVersion = LastSeenUpdateVersion
-    };
+        if (!GenerateCoolerSnake
+            || !SupportsCoolerSnakes
+            || SolverResult is not { Placements.Count: > 0 })
+            return null;
+
+        return new CoolerOverlaySolveRequest(
+            Grid,
+            SelectedTetrisType.Value,
+            SolverResult.Placements,
+            Math.Max(1, ThreadCount),
+            Math.Clamp(MaxTimeSeconds, 1, CoolerSnakeOptions.DefaultMaxTimeSeconds));
+    }
+
+    private void OnCoolerSessionStateChanged()
+    {
+        OnPropertyChanged(nameof(CoolerResult));
+        OnPropertyChanged(nameof(IsCoolerBusy));
+        NotifyCoolerAvailabilityChanged();
+
+        if (coolerSession.IsBusy)
+            return;
+
+        if (CoolerResult is { Status: not CoolerSnakeStatus.Sat } failed)
+            StatusDetailText = $"Cooler: {failed.Status} — {failed.Detail}";
+    }
+
+    public void DisposeCoolerSession()
+    {
+        coolerSession.StateChanged -= OnCoolerSessionStateChanged;
+        coolerSession.Dispose();
+    }
+
+    public UserSettings CreateUserSettings() => UserSettingsResolution.FromViewModel(this);
 
     partial void OnDefaultExportHeightFiveClipChanged(int value)
     {
@@ -264,116 +285,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void ApplyUserSettings(UserSettings settings)
     {
-        var defaults = new UserSettings();
-
-        TemplateShape = ResolveDisplayItem(
-            TemplateShapeValues.All,
-            settings.TemplateShape,
-            defaults.TemplateShape,
-            TemplateShapeValues.All[1]);
-
-        TemplateWidth = ResolveInt(
-            settings.TemplateWidth,
-            defaults.TemplateWidth,
-            MinTemplateDimension,
-            MaxTemplateDimension);
-
-        TemplateHeight = ResolveInt(
-            settings.TemplateHeight,
-            defaults.TemplateHeight,
-            MinTemplateDimension,
-            MaxTemplateDimension);
-
-        IsHeightLocked = settings.IsHeightLocked;
-        if (IsHeightLocked)
-            TemplateHeight = TemplateWidth;
-
-        SelectedTetrisType = ResolveDisplayItem(
-            EnumValues.TetrisTypes,
-            settings.SelectedTetrisType,
-            defaults.SelectedTetrisType,
-            EnumValues.TetrisTypes[0]);
-
-        SelectedSymmetryType = ResolveDisplayItem(
-            EnumValues.SymmetryTypes,
-            settings.SelectedSymmetryType,
-            defaults.SelectedSymmetryType,
-            EnumValues.SymmetryTypes[0]);
-
-        IsHardSymmetry = settings.IsHardSymmetry;
-        EarlyStopEnabled = settings.EarlyStopEnabled;
-        MaxTimeSeconds = ResolveDouble(
-            settings.MaxTimeSeconds,
-            defaults.MaxTimeSeconds,
-            MinSolverSeconds,
-            MaxSolverSeconds);
-        UiScale = settings.UiScale;
-        AutoUpdate = settings.AutoUpdate;
-        ReceiveExperimentalUpdates = settings.ReceiveExperimentalUpdates;
-        ShowReleaseNotesAfterUpdate = settings.ShowReleaseNotesAfterUpdate;
-        PendingReleaseNotesVersion = settings.PendingReleaseNotesVersion;
-        PendingReleaseNotesContent = settings.PendingReleaseNotesContent;
-        LastSeenUpdateVersion = settings.LastSeenUpdateVersion;
-
-        TargetPlacementCount = settings.TargetPlacementCount >= 0
-            ? settings.TargetPlacementCount
-            : defaults.TargetPlacementCount;
-        applyMaximizeFromSettings = settings.IsMaximize;
-
-        PaintMode = ResolveEnum(settings.PaintMode, defaults.PaintMode);
-        LastExportFolder = settings.LastExportFolder;
-        ThreadCount = ResolveInt(settings.ThreadCount, defaults.ThreadCount, 1, MaxThreadCount);
-        DefaultExportHeightBasic = ResolveInt(settings.DefaultExportHeightBasic, defaults.DefaultExportHeightBasic, 1, 8);
-        int resolvedDefaultFiveClip = ResolveInt(
-            settings.DefaultExportHeightFiveClip,
-            defaults.DefaultExportHeightFiveClip,
-            FiveClipHeight.MinHeight,
-            FiveClipHeight.MaxHeight);
-        DefaultExportHeightFiveClip = FiveClipHeight.RoundToMultipleOf3(resolvedDefaultFiveClip);
-        ExportNameTemplate = string.IsNullOrWhiteSpace(settings.ExportNameTemplate)
-            ? defaults.ExportNameTemplate
-            : settings.ExportNameTemplate;
-        NumSolutions = ResolveInt(settings.NumSolutions, defaults.NumSolutions, 1, 50);
-    }
-
-    private static EnumDisplayItem<TEnum> ResolveDisplayItem<TEnum>(
-        IReadOnlyList<EnumDisplayItem<TEnum>> values,
-        TEnum settingValue,
-        TEnum defaultValue,
-        EnumDisplayItem<TEnum> fallback)
-        where TEnum : struct, Enum
-    {
-        var resolvedValue = ResolveEnum(settingValue, defaultValue);
-        foreach (var item in values)
-        {
-            if (EqualityComparer<TEnum>.Default.Equals(item.Value, resolvedValue))
-                return item;
-        }
-
-        return fallback;
-    }
-
-    private static TEnum ResolveEnum<TEnum>(TEnum settingValue, TEnum fallback)
-        where TEnum : struct, Enum =>
-        Enum.IsDefined(settingValue) ? settingValue : fallback;
-
-    private static int ResolveInt(int settingValue, int fallback, int min, int max)
-    {
-        if (settingValue < min || settingValue > max)
-            return fallback;
-
-        return settingValue;
-    }
-
-    private static double ResolveDouble(double settingValue, double fallback, double min, double max)
-    {
-        if (double.IsNaN(settingValue) || double.IsInfinity(settingValue))
-            return fallback;
-
-        if (settingValue < min || settingValue > max)
-            return fallback;
-
-        return settingValue;
+        var validated = UserSettingsResolution.ApplyTo(this, settings, MaxThreadCount);
+        applyMaximizeFromSettings = validated.IsMaximize;
     }
 
     private void RegenerateGrid()
@@ -403,6 +316,9 @@ public partial class MainWindowViewModel : ObservableObject
         ElapsedTimeText = "";
         StatusDetailText = "";
         StatusForeground = DefaultStatusBrush;
+        NotifyCoolerAvailabilityChanged();
+        // SolverResult may already be null (no OnSolverResultChanged); still drop stale cooler cache.
+        coolerSession.ScheduleOverlaySolve();
     }
 
     private void ClearPlacementDisplay()
@@ -460,7 +376,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void RecomputeMaxPlacements()
     {
-        int newMaxPlacements = GetTheoreticalMaxClusters(SelectedTetrisType.Value, Grid.AvailableCellCount);
+        int newMaxPlacements = PlacementTargeting.TheoreticalMaxClusters(
+            SelectedTetrisType.Value, Grid.AvailableCellCount);
         MaxPlacements = newMaxPlacements;
 
         if (applyMaximizeFromSettings)
@@ -517,8 +434,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void SetTargetPlacementCountFromRatio()
     {
-        int scaledTarget = (int)Math.Round(targetRatio * MaxPlacements);
-        int clampedTarget = Math.Clamp(scaledTarget, SliderMinimum, MaxPlacements);
+        int clampedTarget = PlacementTargeting.FromRatio(targetRatio, MaxPlacements);
 
         suppressRatioUpdate = true;
         try
@@ -531,13 +447,6 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private static int GetTheoreticalMaxClusters(TetrisType type, int availableCells) => type switch
-    {
-        TetrisType.ThreeClip or TetrisType.FourClip => availableCells / type.EffectiveAutoloadersPerPlacement(),
-        TetrisType.FiveClip => (2 * availableCells) / 9,
-        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported tetris type.")
-    };
-
     [RelayCommand]
     private void SetPaintMode(PaintMode mode) => PaintMode = mode;
 
@@ -545,39 +454,22 @@ public partial class MainWindowViewModel : ObservableObject
     private void ResetToTemplate() => RegenerateGrid();
 
     private bool CanResetToTemplate() => !IsGenerating;
-
     [RelayCommand]
     private void PaintCell((int Row, int Col) cell)
     {
         if (!Grid.IsInBounds(cell.Row, cell.Col))
             return;
 
-        CellState newState = PaintMode switch
-        {
-            PaintMode.Toggle => Grid[cell.Row, cell.Col] == CellState.Available
-                ? CellState.Blocked
-                : CellState.Available,
-            PaintMode.Clear => CellState.Available,
-            _ => CellState.Blocked
-        };
-
+        CellState newState = CellPainting.NextState(Grid[cell.Row, cell.Col], PaintMode);
         var symmetryType = SelectedSymmetryType.Value;
-        var positions = new List<(int Row, int Col)> { (cell.Row, cell.Col) };
-        if (symmetryType != SymmetryType.None)
+        if (symmetryType == SymmetryType.Rotation90 && Grid.Width != Grid.Height)
         {
-            if (symmetryType == SymmetryType.Rotation90 && Grid.Width != Grid.Height)
-            {
-                StatusLabel = "Rotation90 requires square grid";
-                StatusForeground = TimedOutBrush;
-            }
-            else
-            {
-                positions = SymmetryTransforms.GetSymmetricPositions(
-                    cell.Row, cell.Col, Grid.Width, Grid.Height, symmetryType).ToList();
-            }
+            StatusLabel = "Rotation90 requires square grid";
+            StatusForeground = TimedOutBrush;
         }
 
-        foreach (var (row, col) in positions)
+        foreach (var (row, col) in CellPainting.PositionsToPaint(
+                     cell.Row, cell.Col, Grid.Width, Grid.Height, symmetryType))
         {
             if (Grid.IsInBounds(row, col))
                 Grid[row, col] = newState;
@@ -593,6 +485,39 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanGenerate))]
     private async Task GenerateAsync()
     {
+        BeginGenerateUi(out var ct);
+        try
+        {
+            var options = BuildSolverOptions();
+            var gridSnapshot = Grid.Clone();
+            var tetrisType = SelectedTetrisType.Value;
+            var result = await Task.Run(
+                () => new TetrisSolver().Solve(gridSnapshot, tetrisType, options, ct), ct);
+
+            result = ApplyTrimmedSolutionsIfNeeded(result, gridSnapshot, tetrisType);
+            ApplySuccessfulSolve(result);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusLabel = "Cancelled";
+            ElapsedTimeText = FormatDuration(solveStopwatch!.Elapsed);
+            StatusForeground = DefaultStatusBrush;
+        }
+        catch (Exception ex)
+        {
+            StatusLabel = "Error";
+            StatusDetailText = ex.Message;
+            ElapsedTimeText = FormatDuration(solveStopwatch!.Elapsed);
+            StatusForeground = ErrorBrush;
+        }
+        finally
+        {
+            EndGenerateUi();
+        }
+    }
+
+    private void BeginGenerateUi(out CancellationToken ct)
+    {
         IsGenerating = true;
         ClearPlacementDisplay();
         StatusLabel = "Solving...";
@@ -605,102 +530,87 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasMultipleSolutions));
         OnPropertyChanged(nameof(SolutionCounterText));
         cancellationTokenSource = new CancellationTokenSource();
-        var ct = cancellationTokenSource.Token;
+        ct = cancellationTokenSource.Token;
 
         solveStopwatch = System.Diagnostics.Stopwatch.StartNew();
-        elapsedTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        elapsedTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         elapsedTimer.Tick += (_, _) => ElapsedTimeText = FormatDuration(solveStopwatch?.Elapsed ?? TimeSpan.Zero);
         elapsedTimer.Start();
+    }
 
-        try
+    private void EndGenerateUi()
+    {
+        elapsedTimer?.Stop();
+        elapsedTimer = null;
+        solveStopwatch?.Stop();
+        solveStopwatch = null;
+        cancellationTokenSource?.Dispose();
+        cancellationTokenSource = null;
+        IsGenerating = false;
+        HasSolverRun = true;
+        NotifyCoolerAvailabilityChanged();
+    }
+
+    private SolverOptions BuildSolverOptions() => new()
+    {
+        MaxThreads = ThreadCount,
+        MaxTimeSeconds = MaxTimeSeconds,
+        SymmetryType = SelectedSymmetryType.Value,
+        SymmetryMode = IsHardSymmetry ? SymmetryMode.Hard : SymmetryMode.Soft,
+        EarlyStopEnabled = EarlyStopEnabled,
+        TargetClusterCount = IsMaximize ? null : TargetPlacementCount,
+        NumSolutions = NumSolutions
+    };
+
+    private SolverResult ApplyTrimmedSolutionsIfNeeded(
+        SolverResult result,
+        ApsGenerator.Core.Models.Grid gridSnapshot,
+        TetrisType tetrisType)
+    {
+        if (IsMaximize || result.Placements.Count == 0)
+            return result;
+
+        var trimmedSolutions = new List<IReadOnlyList<Placement>>();
+        foreach (var solution in result.AllSolutions)
         {
-            var solver = new TetrisSolver();
-            var options = new SolverOptions
-            {
-                MaxThreads = ThreadCount,
-                MaxTimeSeconds = MaxTimeSeconds,
-                SymmetryType = SelectedSymmetryType.Value,
-                SymmetryMode = IsHardSymmetry ? SymmetryMode.Hard : SymmetryMode.Soft,
-                EarlyStopEnabled = EarlyStopEnabled,
-                TargetClusterCount = IsMaximize ? null : TargetPlacementCount,
-                NumSolutions = NumSolutions
-            };
-            var gridSnapshot = Grid.Clone();
-            var tetrisType = SelectedTetrisType.Value;
-            var result = await Task.Run(
-                () => solver.Solve(gridSnapshot, tetrisType, options, ct), ct);
-
-            if (!IsMaximize && result.Placements.Count > 0)
-            {
-                var trimmedSolutions = new List<IReadOnlyList<Placement>>();
-                foreach (var solution in result.AllSolutions)
-                {
-                    var trimmed = PlacementTrimmer.Trim(
-                        solution, gridSnapshot, tetrisType,
-                        SelectedSymmetryType.Value, TargetPlacementCount);
-                    trimmedSolutions.Add(trimmed);
-                }
-
-                var firstTrimmed = trimmedSolutions[0];
-                var shapes = ClusterShape.GetShapes(tetrisType);
-                var covered = new HashSet<(int, int)>();
-                foreach (var p in firstTrimmed)
-                    foreach (var o in shapes[p.ShapeIndex].Offsets)
-                        covered.Add((p.Row + o.DeltaRow, p.Col + o.DeltaCol));
-
-                result = new SolverResult
-                {
-                    Placements = firstTrimmed,
-                    AllSolutions = trimmedSolutions,
-                    EmptyCells = gridSnapshot.AvailableCellCount - covered.Count,
-                    Status = result.Status
-                };
-            }
-
-            allTrimmedSolutions = result.AllSolutions;
-            CurrentSolutionIndex = 0;
-            OnPropertyChanged(nameof(HasMultipleSolutions));
-            OnPropertyChanged(nameof(SolutionCounterText));
-            NextSolutionCommand.NotifyCanExecuteChanged();
-            PrevSolutionCommand.NotifyCanExecuteChanged();
-
-            SolverResult = result;
-            CanExport = result.Placements.Count > 0;
-            UpdatePlacementDisplay(result.ClusterCount);
-            StatusLabel = result.Status switch
-            {
-                SolverStatus.Optimal => "Optimal",
-                SolverStatus.LikelyOptimal => "Likely Optimal",
-                SolverStatus.TimedOut => "Timed Out",
-                _ => result.Status.ToString()
-            };
-            ElapsedTimeText = FormatDuration(solveStopwatch.Elapsed);
-            StatusForeground = GetStatusBrush(result.Status);
+            var trimmed = PlacementTrimmer.Trim(
+                solution, gridSnapshot, tetrisType,
+                SelectedSymmetryType.Value, TargetPlacementCount);
+            trimmedSolutions.Add(trimmed);
         }
-        catch (OperationCanceledException)
+
+        var firstTrimmed = trimmedSolutions[0];
+        return new SolverResult
         {
-            StatusLabel = "Cancelled";
-            ElapsedTimeText = FormatDuration(solveStopwatch.Elapsed);
-            StatusForeground = DefaultStatusBrush;
-        }
-        catch (Exception ex)
+            Placements = firstTrimmed,
+            AllSolutions = trimmedSolutions,
+            EmptyCells = CountEmptyCells(firstTrimmed, tetrisType, gridSnapshot.AvailableCellCount),
+            Status = result.Status
+        };
+    }
+
+    private void ApplySuccessfulSolve(SolverResult result)
+    {
+        allTrimmedSolutions = result.AllSolutions;
+        CurrentSolutionIndex = 0;
+        OnPropertyChanged(nameof(HasMultipleSolutions));
+        OnPropertyChanged(nameof(SolutionCounterText));
+        NextSolutionCommand.NotifyCanExecuteChanged();
+        PrevSolutionCommand.NotifyCanExecuteChanged();
+
+        SolverResult = result;
+        CanExport = result.Placements.Count > 0;
+        UpdatePlacementDisplay(result.ClusterCount);
+        StatusLabel = result.Status switch
         {
-            StatusLabel = "Error";
-            StatusDetailText = ex.Message;
-            ElapsedTimeText = FormatDuration(solveStopwatch.Elapsed);
-            StatusForeground = ErrorBrush;
-        }
-        finally
-        {
-            elapsedTimer?.Stop();
-            elapsedTimer = null;
-            solveStopwatch?.Stop();
-            solveStopwatch = null;
-            cancellationTokenSource?.Dispose();
-            cancellationTokenSource = null;
-            IsGenerating = false;
-            HasSolverRun = true;
-        }
+            SolverStatus.Optimal => "Optimal",
+            SolverStatus.LikelyOptimal => "Likely Optimal",
+            SolverStatus.TargetDensityReached => "Target Density Reached",
+            SolverStatus.TimedOut => "Timed Out",
+            _ => result.Status.ToString()
+        };
+        ElapsedTimeText = FormatDuration(solveStopwatch!.Elapsed);
+        StatusForeground = GetStatusBrush(result.Status);
     }
 
     private bool CanGenerate() => !IsGenerating && !IsRotation90NonSquareWarning;
@@ -709,6 +619,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         SolverStatus.Optimal => OptimalBrush,
         SolverStatus.LikelyOptimal => LikelyOptimalBrush,
+        SolverStatus.TargetDensityReached => LikelyOptimalBrush,
         SolverStatus.TimedOut => TimedOutBrush,
         _ => DefaultStatusBrush
     };
@@ -746,6 +657,28 @@ public partial class MainWindowViewModel : ObservableObject
 
     private bool CanGoPrevSolution() => CurrentSolutionIndex > 0;
 
+    [RelayCommand(CanExecute = nameof(CanToggleCoolerOverlay))]
+    private void ToggleCoolerOverlay()
+    {
+        ShowCoolerOverlay = !ShowCoolerOverlay;
+    }
+
+    partial void OnGenerateCoolerSnakeChanged(bool value)
+    {
+        if (!value)
+            coolerSession.ClearResult();
+
+        NotifyCoolerAvailabilityChanged();
+        coolerSession.ScheduleOverlaySolve();
+    }
+
+    private void NotifyCoolerAvailabilityChanged()
+    {
+        OnPropertyChanged(nameof(SupportsCoolerSnakes));
+        OnPropertyChanged(nameof(CanToggleCoolerOverlay));
+        ToggleCoolerOverlayCommand.NotifyCanExecuteChanged();
+    }
+
     partial void OnCurrentSolutionIndexChanged(int value)
     {
         NextSolutionCommand.NotifyCanExecuteChanged();
@@ -763,17 +696,11 @@ public partial class MainWindowViewModel : ObservableObject
         if (SolverResult is null)
             return;
 
-        var shapes = ClusterShape.GetShapes(SelectedTetrisType.Value);
-        var covered = new HashSet<(int, int)>();
-        foreach (var p in placements)
-            foreach (var o in shapes[p.ShapeIndex].Offsets)
-                covered.Add((p.Row + o.DeltaRow, p.Col + o.DeltaCol));
-
         SolverResult = new SolverResult
         {
             Placements = placements,
             AllSolutions = allTrimmedSolutions,
-            EmptyCells = Grid.AvailableCellCount - covered.Count,
+            EmptyCells = CountEmptyCells(placements, SelectedTetrisType.Value, Grid.AvailableCellCount),
             Status = SolverResult.Status
         };
 
@@ -783,10 +710,17 @@ public partial class MainWindowViewModel : ObservableObject
 
     partial void OnIsGeneratingChanged(bool value)
     {
+        OnPropertyChanged(nameof(ShowStatusSection));
         GenerateCommand.NotifyCanExecuteChanged();
         CancelCommand.NotifyCanExecuteChanged();
         ResetToTemplateCommand.NotifyCanExecuteChanged();
         ExportCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnHasSolverRunChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowStatusSection));
+        NotifyCoolerAvailabilityChanged();
     }
 
     partial void OnTemplateShapeChanged(
@@ -904,6 +838,7 @@ public partial class MainWindowViewModel : ObservableObject
         CanExport = false;
         ClearStatus();
         RecomputeMaxPlacements();
+        NotifyCoolerAvailabilityChanged();
     }
 
     partial void OnSelectedSymmetryTypeChanged(EnumDisplayItem<SymmetryType> value)
@@ -978,4 +913,11 @@ public partial class MainWindowViewModel : ObservableObject
             return $"{elapsed.TotalSeconds:F2} s";
         return $"{elapsed.TotalMilliseconds:F0} ms";
     }
+
+    private static int CountEmptyCells(
+        IReadOnlyList<Placement> placements,
+        TetrisType tetrisType,
+        int availableCellCount) =>
+        PlacementCoverage.EmptyExclusiveCellCount(
+            placements, ClusterShape.GetShapes(tetrisType), availableCellCount);
 }

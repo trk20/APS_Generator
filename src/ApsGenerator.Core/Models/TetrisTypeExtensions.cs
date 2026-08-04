@@ -12,4 +12,7 @@ public static class TetrisTypeExtensions
 
     public static int EffectiveAutoloadersPerPlacement(this TetrisType type) =>
         type.ClipCount() + 1;
+
+    public static bool SupportsCoolerSnakes(this TetrisType type) =>
+        type is TetrisType.ThreeClip or TetrisType.FourClip or TetrisType.FiveClip;
 }

@@ -1,6 +1,5 @@
 using ApsGenerator.Core;
 using ApsGenerator.Core.Models;
-using ApsGenerator.Solver;
 using System.Reflection;
 
 namespace ApsGenerator.Solver.Tests;
@@ -32,8 +31,8 @@ public sealed class SymmetryTransformTests
         {
             int shapeCount = ClusterShape.GetShapes(type).Count;
             foreach (TransformKind transform in Enum.GetValues<TransformKind>())
-            for (int shapeIndex = 0; shapeIndex < shapeCount; shapeIndex++)
-                yield return [type, shapeIndex, transform];
+                for (int shapeIndex = 0; shapeIndex < shapeCount; shapeIndex++)
+                    yield return [type, shapeIndex, transform];
         }
     }
 
@@ -110,19 +109,19 @@ public sealed class SymmetryTransformTests
         var grid = TemplateGenerator.Rectangle(width: 8, height: 6);
 
         for (int row = 0; row < grid.Height; row++)
-        for (int col = 0; col < grid.Width; col++)
-        {
-            var hThenV = ApplyTransform(TransformKind.HorizontalReflect, row, col, shapeIndex, grid, type);
-            hThenV = ApplyTransform(TransformKind.VerticalReflect, hThenV.Row, hThenV.Col, hThenV.ShapeIndex, grid, type);
+            for (int col = 0; col < grid.Width; col++)
+            {
+                var hThenV = ApplyTransform(TransformKind.HorizontalReflect, row, col, shapeIndex, grid, type);
+                hThenV = ApplyTransform(TransformKind.VerticalReflect, hThenV.Row, hThenV.Col, hThenV.ShapeIndex, grid, type);
 
-            var vThenH = ApplyTransform(TransformKind.VerticalReflect, row, col, shapeIndex, grid, type);
-            vThenH = ApplyTransform(TransformKind.HorizontalReflect, vThenH.Row, vThenH.Col, vThenH.ShapeIndex, grid, type);
+                var vThenH = ApplyTransform(TransformKind.VerticalReflect, row, col, shapeIndex, grid, type);
+                vThenH = ApplyTransform(TransformKind.HorizontalReflect, vThenH.Row, vThenH.Col, vThenH.ShapeIndex, grid, type);
 
-            var rotate180 = ApplyTransform(TransformKind.Rotate180, row, col, shapeIndex, grid, type);
+                var rotate180 = ApplyTransform(TransformKind.Rotate180, row, col, shapeIndex, grid, type);
 
-            Assert.Equal(rotate180, hThenV);
-            Assert.Equal(rotate180, vThenH);
-        }
+                Assert.Equal(rotate180, hThenV);
+                Assert.Equal(rotate180, vThenH);
+            }
     }
 
     [Fact]
@@ -275,24 +274,24 @@ public sealed class SymmetryTransformTests
         int repeatCount)
     {
         for (int row = 0; row < grid.Height; row++)
-        for (int col = 0; col < grid.Width; col++)
-        {
-            int currentRow = row;
-            int currentCol = col;
-            int currentShapeIndex = shapeIndex;
-
-            for (int i = 0; i < repeatCount; i++)
+            for (int col = 0; col < grid.Width; col++)
             {
-                var next = ApplyTransform(transform, currentRow, currentCol, currentShapeIndex, grid, type);
-                currentRow = next.Row;
-                currentCol = next.Col;
-                currentShapeIndex = next.ShapeIndex;
-            }
+                int currentRow = row;
+                int currentCol = col;
+                int currentShapeIndex = shapeIndex;
 
-            Assert.Equal(row, currentRow);
-            Assert.Equal(col, currentCol);
-            Assert.Equal(shapeIndex, currentShapeIndex);
-        }
+                for (int i = 0; i < repeatCount; i++)
+                {
+                    var next = ApplyTransform(transform, currentRow, currentCol, currentShapeIndex, grid, type);
+                    currentRow = next.Row;
+                    currentCol = next.Col;
+                    currentShapeIndex = next.ShapeIndex;
+                }
+
+                Assert.Equal(row, currentRow);
+                Assert.Equal(col, currentCol);
+                Assert.Equal(shapeIndex, currentShapeIndex);
+            }
     }
 
     private static Grid CreateGridForTransform(TransformKind transform) =>

@@ -312,6 +312,18 @@ public sealed class BlockRotationTests
     }
 
     [Fact]
+    public void FiveWay_WithUpAndLateral_KeepsWorldUpOpen()
+    {
+        // Ramp deck coolers need Up + a lateral; 4-way heuristics used to map Up away.
+        var (blockId, blr) = CoolerBlockProfile.SelectBlock([Face.Back, Face.Up]);
+        Assert.Equal(CoolerBlockProfile.Cooler5WayId, blockId);
+
+        // Closed face is local Forward → should be world Down (unused), not Up.
+        Vector3 closed = BlockRotation.TransformDirection(blr, BlockRotation.FaceToVector(Face.Forward));
+        Assert.Equal(-Vector3.UnitY, closed);
+    }
+
+    [Fact]
     public void TryFindRotation_ValidMatch_ReturnsCorrectBlr()
     {
         int blr = BlockRotation.TryFindRotation(Face.Forward, Face.Right, Face.Up, Face.Up);
