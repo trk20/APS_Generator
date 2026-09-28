@@ -23,4 +23,12 @@
     <ProjectReference Include="..\..\src\ApsGenerator.Core\ApsGenerator.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Exercise the mod's engine-independent orchestration without loading Unity. -->
+    <Compile Include="../../src/ApsGenerator.Mod/Generation/ApsGenerationRequest.cs" Link="Mod/Generation/ApsGenerationRequest.cs" />
+    <Compile Include="../../src/ApsGenerator.Mod/Generation/ApsGenerationSettings.cs" Link="Mod/Generation/ApsGenerationSettings.cs" />
+    <Compile Include="../../src/ApsGenerator.Mod/Generation/ApsGenerationSession.cs" Link="Mod/Generation/ApsGenerationSession.cs" />
+    <Compile Include="../../src/ApsGenerator.Mod/Generation/ApsGenerationSolver.cs" Link="Mod/Generation/ApsGenerationSolver.cs" />
+    <Compile Include="../../src/ApsGenerator.Mod/Generation/ApsGenerationStatus.cs" Link="Mod/Generation/ApsGenerationStatus.cs" />
+  </ItemGroup>
 </Project>

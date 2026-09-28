@@ -1,0 +1,98 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GameManagedDir Condition="$([MSBuild]::IsOsPlatform('Linux'))">$(HOME)/.local/share/Steam/steamapps/common/From The Depths/From_The_Depths_Data/Managed</GameManagedDir>
+    <GameManagedDir Condition="$([MSBuild]::IsOsPlatform('Windows'))">C:/Program Files (x86)/Steam/steamapps/common/From The Depths/From_The_Depths_Data/Managed</GameManagedDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Compatibility/CompilerServicesPolyfills.cs" Link="Compatibility/CompilerServicesPolyfills.cs" />
+    <ProjectReference Include="..\ApsGenerator.Core\ApsGenerator.Core.csproj"
+                      AdditionalProperties="TargetFramework=netstandard2.1" />
+    <ProjectReference Include="..\ApsGenerator.Solver\ApsGenerator.Solver.csproj"
+                      AdditionalProperties="TargetFramework=netstandard2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="0Harmony" HintPath="0Harmony.dll" Private="true" />
+    <Reference Include="Core" HintPath="$(GameManagedDir)/Core.dll" Private="false" />
+    <Reference Include="Ftd" HintPath="$(GameManagedDir)/Ftd.dll" Private="false" />
+    <Reference Include="Modding" HintPath="$(GameManagedDir)/Modding.dll" Private="false" />
+    <Reference Include="Newtonsoft.Json" HintPath="$(GameManagedDir)/Newtonsoft.Json.dll" Private="false" />
+    <Reference Include="PlayerProfiles" HintPath="$(GameManagedDir)/PlayerProfiles.dll" Private="false" />
+    <Reference Include="Ui" HintPath="$(GameManagedDir)/Ui.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(GameManagedDir)/UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.IMGUIModule" HintPath="$(GameManagedDir)/UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ImageConversionModule" HintPath="$(GameManagedDir)/UnityEngine.ImageConversionModule.dll" Private="false" />
+    <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(GameManagedDir)/UnityEngine.InputLegacyModule.dll" Private="false" />
+    <Reference Include="UnityEngine.TextRenderingModule" HintPath="$(GameManagedDir)/UnityEngine.TextRenderingModule.dll" Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+    <EmbeddedResource Include="../ApsGenerator.UI/Assets/Icons/icon.ico"
+                      LogicalName="ApsGenerator.Mod.Assets.Icon.ico" />
+    <None Include="header.header" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="header.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="README.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../LICENSE.md" Link="LICENSE.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../THIRD-PARTY-NOTICES.md"
+          Link="THIRD-PARTY-NOTICES.md"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../LICENSES/*"
+          Link="LICENSES/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../native/cryptominisat/LICENSE.txt"
+          Link="LICENSES/CryptoMiniSat-LICENSE.txt"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="ValidateGameReferences" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(GameManagedDir)/Ftd.dll')" Text="From the Depths managed assemblies were not found at $(GameManagedDir). Set GameManagedDir to the game's Managed directory." />
+    <Error Condition="!Exists('0Harmony.dll')" Text="The checked-in 0Harmony.dll is missing from the mod project root." />
+  </Target>
+
+  <Target Name="StageModPackage" DependsOnTargets="Build">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/linux-x64/native/libcryptominisat5.so')"
+           Text="The Linux CryptoMiniSat library is missing." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/linux-x64/native/libgmp.so.10')"
+           Text="The Linux GMP runtime is missing." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/linux-x64/native/libgmpxx.so.4')"
+           Text="The Linux GMP C++ runtime is missing." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/cryptominisat5.dll')"
+           Text="The Windows CryptoMiniSat library is missing. Run tools/build-windows-native.sh first." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/libcadiback.dll')"
+           Text="The Windows CaDiBack library is missing. Run tools/build-windows-native.sh first." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/libcadical.dll')"
+           Text="The Windows CaDiCaL library is missing. Run tools/build-windows-native.sh first." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/libwinpthread-1.dll')"
+           Text="The Windows MinGW threading runtime is missing. Run tools/build-windows-native.sh first." />
+
+    <ItemGroup>
+      <_ModManagedFiles Include="$(TargetDir)ApsGenerator.Core.dll" />
+      <_ModManagedFiles Include="$(TargetDir)ApsGenerator.Solver.dll" />
+      <_ModManagedFiles Include="$(TargetDir)ApsGenerator.Mod.dll" />
+      <_ModManagedFiles Include="$(TargetDir)0Harmony.dll" />
+      <_ModContentFiles Include="$(TargetDir)plugin.json" />
+      <_ModContentFiles Include="$(TargetDir)header.header" />
+      <_ModContentFiles Include="$(TargetDir)header.jpg" />
+      <_ModContentFiles Include="$(TargetDir)README.md" />
+      <_ModContentFiles Include="$(TargetDir)LICENSE.md" />
+      <_ModContentFiles Include="$(TargetDir)THIRD-PARTY-NOTICES.md" />
+      <_ModLicenseFiles Include="$(TargetDir)LICENSES/*" />
+      <_ModNativeFiles Include="$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/linux-x64/native/*" />
+      <_ModNativeFiles Include="$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/*" />
+    </ItemGroup>
+
+    <RemoveDir Directories="$(MSBuildProjectDirectory)/../../artifacts/mod/ApsGenerator" />
+    <MakeDir Directories="$(MSBuildProjectDirectory)/../../artifacts/mod/ApsGenerator/LICENSES" />
+    <Copy SourceFiles="@(_ModManagedFiles);@(_ModContentFiles);@(_ModNativeFiles)"
+          DestinationFolder="$(MSBuildProjectDirectory)/../../artifacts/mod/ApsGenerator" />
+    <Copy SourceFiles="@(_ModLicenseFiles)" DestinationFolder="$(MSBuildProjectDirectory)/../../artifacts/mod/ApsGenerator/LICENSES" />
+    <Message Importance="high" Text="Staged APS Generator mod package at artifacts/mod/ApsGenerator" />
+  </Target>
+</Project>

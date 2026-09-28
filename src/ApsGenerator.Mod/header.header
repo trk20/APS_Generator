@@ -1,0 +1,9 @@
+{
+  "Authors": "trk20",
+  "Version": "00000000-0000-0000-0000-000000000000",
+  "ComponentId": {
+    "Guid": "6f2a9b18-4eb9-4c2c-aa87-1d88f5822b36",
+    "Name": "APS Generator"
+  },
+  "Description": "Generate ready-to-use density-optimized APS prefabs."
+}

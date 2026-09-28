@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace ApsGenerator.UI.Services.Export;
+namespace ApsGenerator.Core.Export;
 
 public sealed record BlockDefinition(
     string Name,

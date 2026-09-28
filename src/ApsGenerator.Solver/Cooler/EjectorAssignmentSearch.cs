@@ -165,6 +165,7 @@ internal static class EjectorAssignmentSearch
         IReadOnlyList<EjectorCandidate> a,
         IReadOnlyList<EjectorCandidate> b) =>
         a.Count != b.Count
-        || a.Zip(b).Any(p => p.First.Kind != p.Second.Kind
-            || !p.First.Protrusion.Equals(p.Second.Protrusion));
+        || a.Zip(b, (first, second) => (First: first, Second: second))
+            .Any(p => p.First.Kind != p.Second.Kind
+                || !p.First.Protrusion.Equals(p.Second.Protrusion));
 }

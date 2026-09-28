@@ -106,9 +106,7 @@ internal static class CoolerGraph
             if (t.Count == 0)
                 return null;
 
-            int pick = chain.FirstOrDefault(active.Contains, t[0]);
-            if (!active.Contains(pick))
-                pick = t[0];
+            int pick = chain.Where(active.Contains).DefaultIfEmpty(t[0]).First();
             terminals.Add(pick);
         }
 

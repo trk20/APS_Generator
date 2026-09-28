@@ -6,6 +6,8 @@ This tool provides a simple, user-friendly method to easily generate density-opt
 
 ![showcase image](readme-images/showcase.png)
 
+> NEW! In-game mod version available - check out the steam workshop page: [APS Generator Mod](https://steamcommunity.com/sharedfiles/filedetails/?id=3808824333)![mod preview](readme-images/mod-preview.png)
+
 ---
 
 ## Features
@@ -20,11 +22,19 @@ This tool provides a simple, user-friendly method to easily generate density-opt
 - **Selectable target density** - choose a desired density target to have the solver aim for, instead of just the optimal solution.
 - **Experimental early stop heuristic** for faster solving (trades a small amount of optimality for significantly reduced solve time in some cases).
 
+> Note: some features don't have support in the mod version - not a limitation of the solver, just that it's hard to make good UI for them within the game. This will likely improve in future updates.
+
 ---
 
 ## Installation
 
-Releases are **self-contained** - no .NET runtime installation required. After installation, updates are delivered automatically.
+### From The Depths Mod
+
+Subscribe to the [APS Generator Mod](https://steamcommunity.com/sharedfiles/filedetails/?id=3808824333) on the Steam Workshop, install it through the game's mod UI, and reload the game to enable the mod. Menu is accessible through a button beside prefab controls or by pressing F7.
+
+### Standalone UI Version
+
+Standalone UI releases are **self-contained** - no .NET runtime installation required. After installation, updates are delivered automatically.
 
 #### Windows
 
@@ -32,14 +42,13 @@ Releases are **self-contained** - no .NET runtime installation required. After i
 2. Run the installer.
 3. When Windows shows "Windows protected your PC", click **More Info** → **Run Anyway**.
 
-| _More Info_                                                 | _Run Anyway_                                                |
-| ----------------------------------------------------------- | ----------------------------------------------------------- |
+| _More Info_ | _Run Anyway_ |
+| --- | --- |
 | ![run-confirmation-1](readme-images/run-confirmation-1.png) | ![run-confirmation-2](readme-images/run-confirmation-2.png) |
 
 4. The app will install and launch automatically. A desktop shortcut is created.
 
-> **Why does Windows block the program?**
-> The executable is unsigned - it doesn't have a certificate identifying its publisher. This is harmless; Windows just can't verify the source automatically.
+> **Why does Windows block the program?** The executable is unsigned - it doesn't have a certificate identifying its publisher. This is harmless; Windows just can't verify the source automatically.
 
 #### Linux
 
@@ -96,10 +105,10 @@ Cells follow symmetry rules if enabled.
 | Reflective   | ![reflexive-result](readme-images/reflexive-symmetry.png)   |
 | Rotational   | ![rotational-result](readme-images/rotational-symmetry.png) |
 
-| **Soft vs Hard Symmetry** | **Example Solution**                                 |
-| ------------------------- | ---------------------------------------------------- |
-| Hard Symmetry             | ![hard-result](readme-images/reflexive-symmetry.png) |
-| Soft Symmetry             | ![soft-result](readme-images/soft-symmetry.png)      |
+| **Soft vs Hard Symmetry** | **Example Solution** |
+| --- | --- |
+| Hard Symmetry | ![hard-result](readme-images/reflexive-symmetry.png) |
+| Soft Symmetry | ![soft-result](readme-images/soft-symmetry.png) |
 
 - **Number of Solutions** - Set how many distinct solutions the solver should generate before stopping. The solver will attempt to find multiple unique layouts that meet the specified parameters (note - this is significantly faster than generating multiple times, around ~50% extra time for 10 solutions instead of 1). After generating, you can cycle through the different solutions using the left and right arrow buttons above the result display. If less unique solutions exist than the number requested, the solver will return all unique solutions.
 - **Show Cooler Snake** - toggle the visibility of the cooler snake on the grid.
@@ -172,8 +181,7 @@ The generated blueprint should now be available in-game. If you can't find it, c
 - 180° rotational symmetry is recommended for 4-clip with the center hole template.
 - If you find that you don't like the generated solution, try changing the number of solutions to generate and see if you get a different layout you prefer. Generating multiple solutions is much faster than generating multiple times and is guaranteed\* to give you unique layouts that meet the same parameters.
 
-> \* : Can produce the same solution in some cases when target density is set to less than 100% - otherwise, all solutions will always be unique.</br>
-> If less unique solutions exist than the number requested, the solver will return all unique solutions and stop.
+> \* : Can produce the same solution in some cases when target density is set to less than 100% - otherwise, all solutions will always be unique.</br> If less unique solutions exist than the number requested, the solver will return all unique solutions and stop.
 
 ---
 
@@ -197,4 +205,5 @@ For development, you'll need .NET 10 SDK and familiarity with [Avalonia UI](http
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the [MIT License](LICENSE.md). Bundled dependencies
+are documented in [Third-party notices](THIRD-PARTY-NOTICES.md).
