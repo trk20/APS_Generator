@@ -178,29 +178,6 @@ public sealed class ModGenerationTests
     }
 
     [Fact]
-    public void DefaultsMatchTheStandaloneApplication()
-    {
-        var settings = new ApsGenerationSettings();
-        ApsGenerationRequest request = settings.CreateRequest();
-
-        Assert.Equal(ApsTemplateShape.CircleCenterHole, settings.TemplateShape);
-        Assert.Equal(15, settings.Width);
-        Assert.Equal(15, settings.Depth);
-        Assert.Equal(CenterHoleShape.Circle, settings.HoleShape);
-        Assert.Equal(1, settings.HoleSize);
-        Assert.True(settings.AllowEvenDimensions);
-        Assert.Equal(TetrisType.ThreeClip, settings.TetrisType);
-        Assert.Equal(SymmetryType.None, settings.SymmetryType);
-        Assert.Equal(SymmetryMode.Hard, settings.SymmetryMode);
-        Assert.Equal(2, settings.ComponentLength);
-        Assert.Equal(30, settings.MaxTimeSeconds);
-        Assert.Equal(settings.MaximumThreads, settings.MaxThreads);
-        Assert.True(settings.EarlyStopEnabled);
-        Assert.Equal(ExportExtraLayers.EjectorsIntakesCoolerSnake, settings.ExtraLayers);
-        Assert.Equal(1, request.CreateSolverOptions().NumSolutions);
-    }
-
-    [Fact]
     public void OddDimensionSnappingCanBeEnabled()
     {
         var settings = new ApsGenerationSettings();

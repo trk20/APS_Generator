@@ -50,7 +50,7 @@ jobs:
           mkdir -p "$DEST"
           cp native/cryptominisat/build/lib/libcryptominisat5.so "$DEST/"
           for soname in libgmp.so.10 libgmpxx.so.4; do
-            dependency=$(ldd native/cryptominisat/build/lib/libcryptominisat5.so | awk -v name="$soname" '$1 == name { print $3; exit }')
+            dependency=$(ldconfig -p | awk -v name="$soname" '$1 == name && !path { path = $NF } END { print path }')
             test -n "$dependency"
             cp -L "$dependency" "$DEST/$soname"
           done
@@ -71,24 +71,16 @@ jobs:
 
       - name: Publish
         run: >
-          dotnet publish src/ApsGenerator.UI/ApsGenerator.UI.csproj
-          -c Release
-          -r linux-x64
-          --self-contained
-          -p:Version=${{ inputs.version }}
+          dotnet publish src/ApsGenerator.UI/ApsGenerator.UI.csproj -c Release -r linux-x64 --self-contained -p:Version=${{ inputs.version }}
+
 
       - name: Install vpk
         run: dotnet tool install -g vpk
 
       - name: Package
         run: >
-          vpk pack
-          --packId APS-Generator
-          --packVersion ${{ inputs.version }}
-          --packDir src/ApsGenerator.UI/bin/Release/net10.0/linux-x64/publish
-          --mainExe ApsGenerator.UI
-          --releaseNotes release-notes.md
-          --outputDir releases
+          vpk pack --packId APS-Generator --packVersion ${{ inputs.version }} --packDir src/ApsGenerator.UI/bin/Release/net10.0/linux-x64/publish --mainExe ApsGenerator.UI --releaseNotes release-notes.md --outputDir releases
+
 
       - uses: actions/upload-artifact@v4
         with:
@@ -114,13 +106,8 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-            make
-            mingw-w64-x86_64-gmp
-            mingw-w64-x86_64-zlib
-            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-gcc mingw-w64-x86_64-binutils mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja make mingw-w64-x86_64-gmp mingw-w64-x86_64-zlib mingw-w64-x86_64-pkgconf
+
 
       - name: Build CryptoMiniSat from source
         shell: msys2 {0}
@@ -139,10 +126,33 @@ jobs:
           mkdir -p "$DEST"
           DLL="native/cryptominisat/build/cmsat5-src/libcryptominisat5win.dll"
           cp "$DLL" "$DEST/cryptominisat5.dll"
-          # Copy MinGW runtime dependencies (libgmp, libwinpthread, etc.)
-          for dep in $(ldd "$DLL" | grep '/mingw64/' | awk '{print $3}'); do
-            cp "$dep" "$DEST/"
-            echo "Copied dependency: $(basename "$dep")"
+          # Recursively package non-system DLLs from the build and MinGW runtime.
+          pending=("$DEST/cryptominisat5.dll")
+          while ((${#pending[@]})); do
+            binary=${pending[0]}
+            pending=("${pending[@]:1}")
+            while read -r dependency; do
+              dependency_path=$(find native/cryptominisat/build /mingw64/bin \
+                -type f -iname "$dependency" -print -quit)
+              if [[ -z "$dependency_path" ]]; then
+                case "${dependency,,}" in
+                  kernel32.dll|msvcrt.dll)
+                    continue
+                    ;;
+                  *)
+                    echo "Unable to package $dependency required by $(basename "$binary")." >&2
+                    exit 1
+                    ;;
+                esac
+              fi
+              destination="$DEST/$(basename "$dependency_path")"
+              if [[ -e "$destination" ]]; then
+                continue
+              fi
+              cp "$dependency_path" "$destination"
+              pending+=("$destination")
+              echo "Copied dependency: $(basename "$dependency_path")"
+            done < <(objdump -p "$binary" | awk '/DLL Name:/ { print $3 }')
           done
           if ldd "$DLL" | grep -qi 'libgmp'; then
             package_version=$(pacman -Q mingw-w64-x86_64-gmp | awk '{print $2}')
@@ -167,24 +177,16 @@ jobs:
 
       - name: Publish
         run: >
-          dotnet publish src/ApsGenerator.UI/ApsGenerator.UI.csproj
-          -c Release
-          -r win-x64
-          --self-contained
-          -p:Version=${{ inputs.version }}
+          dotnet publish src/ApsGenerator.UI/ApsGenerator.UI.csproj -c Release -r win-x64 --self-contained -p:Version=${{ inputs.version }}
+
 
       - name: Install vpk
         run: dotnet tool install -g vpk
 
       - name: Package
         run: >
-          vpk pack
-          --packId APS-Generator
-          --packVersion ${{ inputs.version }}
-          --packDir src/ApsGenerator.UI/bin/Release/net10.0/win-x64/publish
-          --mainExe ApsGenerator.UI.exe
-          --releaseNotes release-notes.md
-          --outputDir releases
+          vpk pack --packId APS-Generator --packVersion ${{ inputs.version }} --packDir src/ApsGenerator.UI/bin/Release/net10.0/win-x64/publish --mainExe ApsGenerator.UI.exe --releaseNotes release-notes.md --outputDir releases
+
 
       - uses: actions/upload-artifact@v4
         with:
@@ -219,28 +221,13 @@ jobs:
 
       - name: Upload Linux Release
         run: >
-          vpk upload github
-          --repoUrl https://github.com/${{ github.repository }}
-          --outputDir releases/linux
-          --channel linux
-          --tag v${{ inputs.version }}
-          --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}"
-          --publish
-          ${{ inputs.experimental && '--pre' || '' }}
-          --token ${{ secrets.GITHUB_TOKEN }}
+          vpk upload github --repoUrl https://github.com/${{ github.repository }} --outputDir releases/linux --channel linux --tag v${{ inputs.version }} --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}" --publish ${{ inputs.experimental && '--pre' || '' }} --token ${{ secrets.GITHUB_TOKEN }}
+
 
       - name: Upload Windows Release
         run: >
-          vpk upload github
-          --repoUrl https://github.com/${{ github.repository }}
-          --outputDir releases/windows
-          --channel win
-          --tag v${{ inputs.version }}
-          --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}"
-          --publish
-          --merge
-          ${{ inputs.experimental && '--pre' || '' }}
-          --token ${{ secrets.GITHUB_TOKEN }}
+          vpk upload github --repoUrl https://github.com/${{ github.repository }} --outputDir releases/windows --channel win --tag v${{ inputs.version }} --releaseName "APS Generator v${{ inputs.version }}${{ inputs.experimental && ' (Experimental)' || '' }}" --publish --merge ${{ inputs.experimental && '--pre' || '' }} --token ${{ secrets.GITHUB_TOKEN }}
+
 
       - name: Set release body
         env:

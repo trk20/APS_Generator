@@ -23,9 +23,9 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private EnumDisplayItem<UiTemplateShape> templateShape = TemplateShapeValues.All[1];
     [ObservableProperty]
-    private int templateWidth = 15;
+    private int templateWidth = ApsGenerationDefaults.TemplateWidth;
     [ObservableProperty]
-    private int templateHeight = 15;
+    private int templateHeight = ApsGenerationDefaults.TemplateDepth;
     [ObservableProperty]
     private bool isHeightLocked = true;
     [ObservableProperty]
@@ -35,9 +35,9 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private EnumDisplayItem<SymmetryType> selectedSymmetryType = EnumValues.SymmetryTypes[0];
     [ObservableProperty]
-    private bool isHardSymmetry = true;
+    private bool isHardSymmetry = ApsGenerationDefaults.DefaultSymmetryMode == SymmetryMode.Hard;
     [ObservableProperty]
-    private double maxTimeSeconds = 30;
+    private double maxTimeSeconds = ApsGenerationDefaults.MaxTimeSeconds;
     [ObservableProperty]
     private double uiScale = 1.0;
     [ObservableProperty]
@@ -56,7 +56,7 @@ public partial class MainWindowViewModel : ObservableObject
     public string? LastSeenUpdateVersion { get; set; }
 
     [ObservableProperty]
-    private bool earlyStopEnabled = true;
+    private bool earlyStopEnabled = ApsGenerationDefaults.EarlyStopEnabled;
     [ObservableProperty]
     private bool generateCoolerSnake = true;
     [ObservableProperty]
@@ -66,7 +66,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool isGenerating;
     [ObservableProperty]
-    private Grid grid = TemplateGenerator.Circle(15, true);
+    private Grid grid = TemplateGenerator.Circle(ApsGenerationDefaults.TemplateWidth, true);
     [ObservableProperty]
     private SolverResult? solverResult;
 
@@ -109,7 +109,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool canExport;
     [ObservableProperty]
-    private int numSolutions = 1;
+    private int numSolutions = ApsGenerationDefaults.NumSolutions;
     [ObservableProperty]
     private int currentSolutionIndex;
 
@@ -175,13 +175,13 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private int threadCount = Math.Max(1, Environment.ProcessorCount - 1);
     [ObservableProperty]
-    private int defaultExportHeightBasic = 2;
+    private int defaultExportHeightBasic = ApsGenerationDefaults.BasicComponentHeight;
     [ObservableProperty]
-    private int defaultExportHeightFiveClip = 3;
+    private int defaultExportHeightFiveClip = FiveClipHeight.MinHeight;
     [ObservableProperty]
-    private ExportExtraLayers exportExtraLayersBasic = ExportExtraLayers.EjectorsIntakesCoolerSnake;
+    private ExportExtraLayers exportExtraLayersBasic = ApsGenerationDefaults.DefaultExtraLayers;
     [ObservableProperty]
-    private ExportExtraLayers exportExtraLayersFiveClip = ExportExtraLayers.EjectorsIntakesCoolerSnake;
+    private ExportExtraLayers exportExtraLayersFiveClip = ApsGenerationDefaults.DefaultExtraLayers;
     [ObservableProperty]
     private string exportNameTemplate = UserSettings.DefaultExportNameTemplate;
 

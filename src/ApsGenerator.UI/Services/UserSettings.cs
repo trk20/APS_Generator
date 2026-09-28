@@ -9,19 +9,19 @@ public sealed class UserSettings
 
     public TemplateShape TemplateShape { get; set; } = TemplateShape.CircleCenterHole;
 
-    public int TemplateWidth { get; set; } = 15;
+    public int TemplateWidth { get; set; } = ApsGenerationDefaults.TemplateWidth;
 
-    public int TemplateHeight { get; set; } = 15;
+    public int TemplateHeight { get; set; } = ApsGenerationDefaults.TemplateDepth;
 
     public bool IsHeightLocked { get; set; } = true;
 
-    public TetrisType SelectedTetrisType { get; set; } = TetrisType.ThreeClip;
+    public TetrisType SelectedTetrisType { get; set; } = ApsGenerationDefaults.DefaultTetrisType;
 
-    public SymmetryType SelectedSymmetryType { get; set; } = SymmetryType.None;
+    public SymmetryType SelectedSymmetryType { get; set; } = ApsGenerationDefaults.DefaultSymmetryType;
 
-    public bool IsHardSymmetry { get; set; } = true;
+    public bool IsHardSymmetry { get; set; } = ApsGenerationDefaults.DefaultSymmetryMode == SymmetryMode.Hard;
 
-    public bool EarlyStopEnabled { get; set; } = true;
+    public bool EarlyStopEnabled { get; set; } = ApsGenerationDefaults.EarlyStopEnabled;
 
     /// <summary>After Tetris, solve cooler snakes for 3/4/5-clip (persisted with solver options).</summary>
     public bool GenerateCoolerSnake { get; set; } = true;
@@ -29,7 +29,7 @@ public sealed class UserSettings
     /// <summary>Show cooler path overlay on the grid (visual only).</summary>
     public bool ShowCoolerOverlay { get; set; } = true;
 
-    public double MaxTimeSeconds { get; set; } = 30;
+    public double MaxTimeSeconds { get; set; } = ApsGenerationDefaults.MaxTimeSeconds;
 
     public bool IsMaximize { get; set; } = true;
 
@@ -41,19 +41,19 @@ public sealed class UserSettings
 
     public int ThreadCount { get; set; } = Math.Max(1, Environment.ProcessorCount - 1);
 
-    public int DefaultExportHeightBasic { get; set; } = 2;
+    public int DefaultExportHeightBasic { get; set; } = ApsGenerationDefaults.BasicComponentHeight;
 
     public int DefaultExportHeightFiveClip { get; set; } = FiveClipHeight.MinHeight;
 
     /// <summary>Persisted extra-layer mode for 3/4-clip exports.</summary>
-    public ExportExtraLayers ExportExtraLayersBasic { get; set; } = ExportExtraLayers.EjectorsIntakesCoolerSnake;
+    public ExportExtraLayers ExportExtraLayersBasic { get; set; } = ApsGenerationDefaults.DefaultExtraLayers;
 
     /// <summary>Persisted extra-layer mode for 5-clip exports (Cooler Snake or Tetris only).</summary>
-    public ExportExtraLayers ExportExtraLayersFiveClip { get; set; } = ExportExtraLayers.EjectorsIntakesCoolerSnake;
+    public ExportExtraLayers ExportExtraLayersFiveClip { get; set; } = ApsGenerationDefaults.DefaultExtraLayers;
 
     public string ExportNameTemplate { get; set; } = DefaultExportNameTemplate;
 
-    public int NumSolutions { get; set; } = 1;
+    public int NumSolutions { get; set; } = ApsGenerationDefaults.NumSolutions;
 
     public double UiScale { get; set; } = 1.0;
 

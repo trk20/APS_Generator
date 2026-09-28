@@ -300,18 +300,18 @@ internal sealed class ApsSettingsData
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public ApsTemplateShape TemplateShape { get; set; } = ApsTemplateShape.CircleCenterHole;
-    public int Width { get; set; } = 15;
-    public int Depth { get; set; } = 15;
-    public int ComponentLength { get; set; } = 3;
-    public CenterHoleShape HoleShape { get; set; } = CenterHoleShape.Circle;
-    public int HoleSize { get; set; } = 1;
+    public int Width { get; set; } = ApsGenerationDefaults.TemplateWidth;
+    public int Depth { get; set; } = ApsGenerationDefaults.TemplateDepth;
+    public int ComponentLength { get; set; } = ApsGenerationDefaults.BasicComponentHeight;
+    public CenterHoleShape HoleShape { get; set; } = ApsGenerationDefaults.DefaultCenterHoleShape;
+    public int HoleSize { get; set; } = ApsGenerationDefaults.CenterHoleSize;
     public bool SnapToOddDimensions { get; set; } = false;
-    public TetrisType TetrisType { get; set; } = TetrisType.ThreeClip;
-    public SymmetryType SymmetryType { get; set; } = SymmetryType.None;
-    public SymmetryMode SymmetryMode { get; set; } = SymmetryMode.Hard;
-    public int MaxTimeSeconds { get; set; } = 30;
+    public TetrisType TetrisType { get; set; } = ApsGenerationDefaults.DefaultTetrisType;
+    public SymmetryType SymmetryType { get; set; } = ApsGenerationDefaults.DefaultSymmetryType;
+    public SymmetryMode SymmetryMode { get; set; } = ApsGenerationDefaults.DefaultSymmetryMode;
+    public int MaxTimeSeconds { get; set; } = ApsGenerationDefaults.MaxTimeSeconds;
     // Zero means "use the maximum" so the preference follows CPU-count changes.
     public int MaxThreads { get; set; }
-    public bool EarlyStopEnabled { get; set; } = true;
-    public ExportExtraLayers ExtraLayers { get; set; } = ExportExtraLayers.EjectorsIntakesCoolerSnake;
+    public bool EarlyStopEnabled { get; set; } = ApsGenerationDefaults.EarlyStopEnabled;
+    public ExportExtraLayers ExtraLayers { get; set; } = ApsGenerationDefaults.DefaultExtraLayers;
 }
