@@ -1,18 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\ApsGenerator.Core\ApsGenerator.Core.csproj" />
+    <ProjectReference Include="..\ApsGenerator.Core\ApsGenerator.Core.csproj"
+                      AdditionalProperties="TargetFramework=$(TargetFramework)" />
+    <Compile Include="..\Compatibility\CompilerServicesPolyfills.cs" Link="Compatibility\CompilerServicesPolyfills.cs" />
   </ItemGroup>
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net10.0;netstandard2.1</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOsPlatform('Linux')))">
-    <None Include="runtimes/linux-x64/native/libcryptominisat5.so" CopyToOutputDirectory="PreserveNewest" Link="libcryptominisat5.so" />
+    <None Include="runtimes/linux-x64/native/*.so*" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('win')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOsPlatform('Windows')))">

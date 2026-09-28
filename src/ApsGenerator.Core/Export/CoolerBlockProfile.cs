@@ -1,12 +1,12 @@
 using ApsGenerator.Core.Models;
 
-namespace ApsGenerator.UI.Services.Export;
+namespace ApsGenerator.Core.Export;
 
 /// <summary>
 /// Local-space connection profiles for cooler block variants.
 /// At BLR=0, these faces are the connected (open) faces of the block.
 /// </summary>
-internal static class CoolerBlockProfile
+public static class CoolerBlockProfile
 {
     public const int Cooler4WayId = 228;
     public const int Cooler5WayId = 229;
@@ -26,7 +26,7 @@ internal static class CoolerBlockProfile
 
     /// <summary>
     /// Map cooler open faces (N,E,S,W) plus vertical links to construct-space <see cref="Face"/> set.
-    /// N,E,S,W ↔ Back,Right,Forward,Left (CoolerCardinals order).
+    /// N,E,S,W <-> Back,Right,Forward,Left (CoolerCardinals order).
     /// </summary>
     public static List<Face> FacesFrom(
         CoolerFaceFlags open,
@@ -71,7 +71,7 @@ internal static class CoolerBlockProfile
     private static (int BlockId, int Blr) Select5Way(IReadOnlyList<Face> connectedWorldFaces)
     {
         Face[] preference = [Face.Down, Face.Up, Face.Forward, Face.Back, Face.Left, Face.Right];
-        Face missing = preference.FirstOrDefault(c => !connectedWorldFaces.Contains(c), Face.Down);
+        Face missing = preference.Where(c => !connectedWorldFaces.Contains(c)).DefaultIfEmpty(Face.Down).First();
         return (Cooler5WayId, BlockRotation.FindRotationOrDefault(NonConnectingFace5Way, missing));
     }
 
@@ -116,7 +116,7 @@ internal static class CoolerBlockProfile
     private static (int BlockId, int Blr) Select3Neighbor(IReadOnlyList<Face> connectedWorldFaces)
     {
         Face[] laterals = [Face.Forward, Face.Back, Face.Right, Face.Left];
-        Face missingFace = laterals.FirstOrDefault(f => !connectedWorldFaces.Contains(f), Face.Down);
+        Face missingFace = laterals.Where(f => !connectedWorldFaces.Contains(f)).DefaultIfEmpty(Face.Down).First();
         return (Cooler5WayId, BlockRotation.FindRotationOrDefault(NonConnectingFace5Way, missingFace));
     }
 

@@ -30,4 +30,23 @@
     <ProjectReference Include="..\ApsGenerator.Solver\ApsGenerator.Solver.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="../../LICENSE.md"
+          Link="LICENSE.md"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../THIRD-PARTY-NOTICES.md"
+          Link="THIRD-PARTY-NOTICES.md"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../LICENSES/*"
+          Link="LICENSES/%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../native/cryptominisat/LICENSE.txt"
+          Link="LICENSES/CryptoMiniSat-LICENSE.txt"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

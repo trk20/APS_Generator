@@ -44,11 +44,26 @@ jobs:
             -DBUILD_PYTHON_EXTENSION=OFF
           cmake --build build --target cryptominisat5
 
-      - name: Copy CMS shared library to runtimes
+      - name: Copy CMS shared library and dependencies to runtimes
         run: |
           DEST="src/ApsGenerator.Solver/runtimes/linux-x64/native"
           mkdir -p "$DEST"
           cp native/cryptominisat/build/lib/libcryptominisat5.so "$DEST/"
+          for soname in libgmp.so.10 libgmpxx.so.4; do
+            dependency=$(ldd native/cryptominisat/build/lib/libcryptominisat5.so | awk -v name="$soname" '$1 == name { print $3; exit }')
+            test -n "$dependency"
+            cp -L "$dependency" "$DEST/$soname"
+          done
+          source_version=$(dpkg-query -W -f='${source:Version}' libgmp-dev)
+          {
+            echo "GNU MP corresponding source"
+            echo "==========================="
+            echo
+            echo "These release binaries came from Ubuntu source package gmp $source_version."
+            echo "Corresponding source, including Ubuntu packaging changes, is available at:"
+            echo
+            echo "https://launchpad.net/ubuntu/+source/gmp/$source_version"
+          } > LICENSES/GMP-SOURCE.txt
           ls -la "$DEST"
 
       - name: Run tests
@@ -129,6 +144,18 @@ jobs:
             cp "$dep" "$DEST/"
             echo "Copied dependency: $(basename "$dep")"
           done
+          if ldd "$DLL" | grep -qi 'libgmp'; then
+            package_version=$(pacman -Q mingw-w64-x86_64-gmp | awk '{print $2}')
+            {
+              echo "GNU MP corresponding source"
+              echo "==========================="
+              echo
+              echo "These release binaries came from MSYS2 package mingw-w64-x86_64-gmp $package_version."
+              echo "The package recipe and corresponding source links are available at:"
+              echo
+              echo "https://packages.msys2.org/packages/mingw-w64-x86_64-gmp"
+            } > LICENSES/GMP-SOURCE.txt
+          fi
           echo "Contents of $DEST:"
           ls -la "$DEST"
 

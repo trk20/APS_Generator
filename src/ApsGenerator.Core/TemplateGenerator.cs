@@ -8,6 +8,12 @@ public static class TemplateGenerator
 
     public static Grid Circle(int diameter, bool blockCenter)
     {
+        int holeSize = blockCenter && diameter % 2 != 0 ? 1 : 0;
+        return Circle(diameter, CenterHoleShape.Circle, holeSize);
+    }
+
+    public static Grid Circle(int diameter, CenterHoleShape holeShape, int holeSize)
+    {
         var grid = new Grid(diameter, diameter);
 
         double centerX = (diameter - 1.0) / 2.0;
@@ -22,15 +28,26 @@ public static class TemplateGenerator
             double dx = c - centerX;
             double distSq = dy * dy + dx * dx;
 
-            if (distSq >= radiusSq - RadiusEpsilon)
+            if (distSq >= radiusSq - RadiusEpsilon || IsInsideHole(dx, dy, holeShape, holeSize))
                 grid[r, c] = CellState.Blocked;
         }
-
-        if (blockCenter && diameter % 2 != 0)
-            grid[(int)centerY, (int)centerX] = CellState.Blocked;
 
         return grid;
     }
 
     public static Grid Rectangle(int width, int height) => new(width, height);
+
+    private static bool IsInsideHole(double x, double y, CenterHoleShape shape, int size)
+    {
+        if (size <= 0)
+            return false;
+
+        double radius = size / 2.0;
+        return shape switch
+        {
+            CenterHoleShape.Circle => x * x + y * y < radius * radius - RadiusEpsilon,
+            CenterHoleShape.Square => Math.Abs(x) < radius && Math.Abs(y) < radius,
+            _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, null)
+        };
+    }
 }

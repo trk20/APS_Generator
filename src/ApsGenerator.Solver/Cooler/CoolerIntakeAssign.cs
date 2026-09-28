@@ -16,7 +16,7 @@ internal static class CoolerIntakeAssign
         bool[] intakeMask,
         Random? random)
     {
-        Array.Clear(intakeMask);
+        Array.Clear(intakeMask, 0, intakeMask.Length);
         var packing = ctx.Packing;
         var exclusiveSet = ctx.ExclusiveSet;
         var loaderIndex = packing.LoaderCells
@@ -64,7 +64,7 @@ internal static class CoolerIntakeAssign
         var rng = new Random(randomSeed);
         for (int t = 0; t < randomTrials; t++)
         {
-            Array.Clear(mask);
+            Array.Clear(mask, 0, mask.Length);
             if (TryAssign(ctx, byCluster, mask, rng))
                 yield return (bool[])mask.Clone();
         }
@@ -176,7 +176,7 @@ internal static class CoolerIntakeAssign
         Dictionary<int, EjectorCandidate> byCluster,
         bool[] intakeMask)
     {
-        Array.Clear(intakeMask);
+        Array.Clear(intakeMask, 0, intakeMask.Length);
         var packing = ctx.Packing;
         var exclusiveSet = ctx.ExclusiveSet;
 

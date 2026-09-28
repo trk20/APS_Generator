@@ -74,6 +74,44 @@ public sealed class TemplateGeneratorTests
             }
     }
 
+    [Fact]
+    public void Circle_EvenDiameterAndCircularHole_AreCenteredBetweenFourCells()
+    {
+        Grid grid = TemplateGenerator.Circle(10, CenterHoleShape.Circle, holeSize: 2);
+
+        Assert.Equal(CellState.Blocked, grid[4, 4]);
+        Assert.Equal(CellState.Blocked, grid[4, 5]);
+        Assert.Equal(CellState.Blocked, grid[5, 4]);
+        Assert.Equal(CellState.Blocked, grid[5, 5]);
+        Assert.Equal(CellState.Available, grid[3, 4]);
+        AssertPointSymmetry(grid);
+    }
+
+    [Fact]
+    public void Circle_SquareHole_BlocksRequestedCenteredSideLength()
+    {
+        Grid grid = TemplateGenerator.Circle(9, CenterHoleShape.Square, holeSize: 3);
+
+        for (int row = 3; row <= 5; row++)
+        for (int column = 3; column <= 5; column++)
+            Assert.Equal(CellState.Blocked, grid[row, column]);
+
+        Assert.Equal(CellState.Available, grid[2, 4]);
+        Assert.Equal(CellState.Available, grid[4, 2]);
+        AssertPointSymmetry(grid);
+    }
+
+    [Fact]
+    public void Circle_CircularHole_UsesDiameterRasterization()
+    {
+        Grid grid = TemplateGenerator.Circle(11, CenterHoleShape.Circle, holeSize: 5);
+
+        Assert.Equal(CellState.Blocked, grid[5, 7]);
+        Assert.Equal(CellState.Available, grid[5, 8]);
+        Assert.Equal(CellState.Available, grid[3, 3]);
+        AssertPointSymmetry(grid);
+    }
+
     private static int CountExpectedCircleAvailable(int diameter, bool blockCenter)
     {
         int available = 0;
@@ -86,6 +124,15 @@ public sealed class TemplateGeneratorTests
             }
 
         return available;
+    }
+
+    private static void AssertPointSymmetry(Grid grid)
+    {
+        for (int row = 0; row < grid.Height; row++)
+        for (int column = 0; column < grid.Width; column++)
+            Assert.Equal(
+                grid[row, column],
+                grid[grid.Height - 1 - row, grid.Width - 1 - column]);
     }
 
     private static bool IsBlockedByCircleFormula(int diameter, int row, int col, bool blockCenter)

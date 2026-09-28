@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace ApsGenerator.UI.Services.Export;
+namespace ApsGenerator.Core.Export;
 
 public enum Face
 {
@@ -15,7 +15,7 @@ public enum Face
 /// <summary>
 /// Computes BLR rotation indices using the game's 24-rotation table.
 /// Each rotation index maps to an axis-aligned orientation defined by a (forward, up) pair.
-/// A block's local axes are transformed by the rotation: local +Z → forward, local +Y → up, local +X → right.
+/// A block's local axes are transformed by the rotation: local +Z -> forward, local +Y -> up, local +X -> right.
 /// </summary>
 public static class BlockRotation
 {
@@ -90,8 +90,8 @@ public static class BlockRotation
 
     /// <summary>
     /// Transform a local-space direction by the given rotation index.
-    /// The rotation basis maps: local +X → right, local +Y → up, local +Z → forward.
-    /// Right is derived as Cross(up, forward) per Unity's left-handed convention.
+    /// The rotation basis maps: local +X -> right, local +Y -> up, local +Z -> forward.
+    /// Right is derived as Cross(up, forward) to follow Unity left-handed convention.
     /// </summary>
     public static Vector3 TransformDirection(int rotationIndex, Vector3 localDirection)
     {
@@ -139,7 +139,7 @@ public static class BlockRotation
     };
 
     /// <summary>
-    /// Finds BLR where localFace→worldFace and localSecondary→worldSecondary.
+    /// Finds BLR where localFace -> worldFace and localSecondary -> worldSecondary.
     /// Returns -1 if no valid rotation exists.
     /// </summary>
     public static int TryFindRotation(Face localFace, Face worldFace, Face localSecondary, Face worldSecondary)
@@ -158,7 +158,7 @@ public static class BlockRotation
     }
 
     /// <summary>
-    /// Finds BLR where localFace→worldFace and localSecondary→worldSecondary.
+    /// Finds BLR where localFace -> worldFace and localSecondary -> worldSecondary.
     /// Throws if no rotation exists.
     /// </summary>
     public static int FindRotation(Face localFace, Face worldFace, Face localSecondary, Face worldSecondary)
@@ -171,7 +171,7 @@ public static class BlockRotation
     }
 
     /// <summary>
-    /// Find BLR where localFace maps to worldFace. Prefers rotation where local Up → world Up.
+    /// Find BLR where localFace maps to worldFace. Prefers rotation where local Up -> world Up.
     /// Returns defaultBlr if no match.
     /// </summary>
     public static int FindRotationOrDefault(Face localFace, Face worldFace, int defaultBlr = 0)

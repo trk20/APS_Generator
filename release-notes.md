@@ -1,11 +1,16 @@
 # Changes
 
-- Added cooler snake generation and export (Major feature)
-- Added more export options
+- Added FtD-native mod version in addition to the existing standalone UI
 
 <!-- install-start -->
 
 ## Installation
+
+### From The Depths Mod
+
+Just like any other FtD mod - subscribe to the [APS Generator Mod](https://steamcommunity.com/sharedfiles/filedetails/?id=3808824333) on the Steam Workshop, install it through the FtD mod UI, and reload the game to enable the mod. Menu is accessible through a button beside prefab controls or by pressing F7.
+
+### Standalone UI Version
 
 #### Windows
 
@@ -14,8 +19,7 @@
 3. When Windows shows "Windows protected your PC", click **More Info** → **Run Anyway**.
 4. The app will install and launch automatically. A desktop shortcut is created.
 
-> **Why does Windows block the program?**
-> The executable is unsigned - it doesn't have a certificate identifying its publisher. This is harmless; Windows just can't verify the source automatically.
+> **Why does Windows block the program?** The executable is unsigned - it doesn't have a certificate identifying its publisher. This is harmless; Windows just can't verify the source automatically.
 
 #### Linux
 
