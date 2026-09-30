@@ -33,7 +33,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ninja-build git \
+            build-essential cmake ninja-build git patchelf \
             libgmp-dev zlib1g-dev
 
       - name: Build CryptoMiniSat from source
@@ -47,13 +47,50 @@ jobs:
       - name: Copy CMS shared library and dependencies to runtimes
         run: |
           DEST="src/ApsGenerator.Solver/runtimes/linux-x64/native"
+          BUILD_ROOT=$(realpath native/cryptominisat/build)
+          CMS_LIBRARY="$BUILD_ROOT/lib/libcryptominisat5.so"
           mkdir -p "$DEST"
-          cp native/cryptominisat/build/lib/libcryptominisat5.so "$DEST/"
-          for soname in libgmp.so.10 libgmpxx.so.4; do
-            dependency=$(ldconfig -p | awk -v name="$soname" '$1 == name && !path { path = $NF } END { print path }')
-            test -n "$dependency"
-            cp -L "$dependency" "$DEST/$soname"
+          cp -L "$CMS_LIBRARY" "$DEST/libcryptominisat5.so"
+
+          # CryptoMiniSat's fetched CaDiCaL/CaDiBaCk revisions may build either
+          # static or shared libraries. Recursively package any shared build
+          # dependencies, plus GMP, rather than relying on a fixed dependency list.
+          pending=("$CMS_LIBRARY")
+          declare -A inspected=()
+          while ((${#pending[@]})); do
+            binary=${pending[0]}
+            pending=("${pending[@]:1}")
+            binary=$(realpath "$binary")
+            if [[ -n "${inspected[$binary]:-}" ]]; then
+              continue
+            fi
+            inspected[$binary]=1
+
+            while read -r soname dependency_path; do
+              if [[ "$dependency_path" == "not" ]]; then
+                echo "Unable to resolve $soname required by $binary." >&2
+                exit 1
+              fi
+
+              dependency_path=$(realpath "$dependency_path")
+              case "$dependency_path" in
+                "$BUILD_ROOT"/*|*/libgmp.so.*|*/libgmpxx.so.*)
+                  destination="$DEST/$soname"
+                  if [[ ! -e "$destination" ]]; then
+                    cp -L "$dependency_path" "$destination"
+                    echo "Copied dependency: $soname"
+                  fi
+                  pending+=("$dependency_path")
+                  ;;
+              esac
+            done < <(ldd "$binary" | awk '/=>/ { print $1, $3 }')
           done
+
+          # The dynamic loader does not search the directory of a dependent
+          # library by default. Make every packaged library resolve siblings.
+          find "$DEST" -maxdepth 1 -type f -name '*.so*' \
+            -exec patchelf --set-rpath '$ORIGIN' {} \;
+
           source_version=$(dpkg-query -W -f='${source:Version}' libgmp-dev)
           {
             echo "GNU MP corresponding source"
@@ -73,6 +110,24 @@ jobs:
         run: >
           dotnet publish src/ApsGenerator.UI/ApsGenerator.UI.csproj -c Release -r linux-x64 --self-contained -p:Version=${{ inputs.version }}
 
+      - name: Verify packaged Linux native dependencies
+        run: |
+          NATIVE_DIR="src/ApsGenerator.Solver/runtimes/linux-x64/native"
+          PUBLISH_DIR="src/ApsGenerator.UI/bin/Release/net10.0/linux-x64/publish"
+          for source_library in "$NATIVE_DIR"/*.so*; do
+            library="$PUBLISH_DIR/$(basename "$source_library")"
+            if [[ ! -f "$library" ]]; then
+              echo "Missing published native library: $(basename "$library")" >&2
+              exit 1
+            fi
+
+            echo "Checking $(basename "$library")"
+            dependency_report=$(ldd "$library")
+            echo "$dependency_report"
+            if grep -q 'not found' <<< "$dependency_report"; then
+              exit 1
+            fi
+          done
 
       - name: Install vpk
         run: dotnet tool install -g vpk
