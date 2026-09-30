@@ -1,6 +1,7 @@
-# Changes
+# Recent Changes
 
-- Added FtD-native mod version in addition to the existing standalone UI
+- Added FtD-native mod version in addition to the existing standalone UI (https://steamcommunity.com/sharedfiles/filedetails/?id=3808824333)
+- Fixed CMS bundling issue in linux version of standalone app
 
 <!-- install-start -->
 
