@@ -112,10 +112,19 @@ jobs:
 
       - name: Verify packaged Linux native dependencies
         run: |
+          NATIVE_DIR="src/ApsGenerator.Solver/runtimes/linux-x64/native"
           PUBLISH_DIR="src/ApsGenerator.UI/bin/Release/net10.0/linux-x64/publish"
-          for library in "$PUBLISH_DIR"/*.so*; do
+          for source_library in "$NATIVE_DIR"/*.so*; do
+            library="$PUBLISH_DIR/$(basename "$source_library")"
+            if [[ ! -f "$library" ]]; then
+              echo "Missing published native library: $(basename "$library")" >&2
+              exit 1
+            fi
+
             echo "Checking $(basename "$library")"
-            if ldd "$library" | tee /dev/stderr | grep -q 'not found'; then
+            dependency_report=$(ldd "$library")
+            echo "$dependency_report"
+            if grep -q 'not found' <<< "$dependency_report"; then
               exit 1
             fi
           done
