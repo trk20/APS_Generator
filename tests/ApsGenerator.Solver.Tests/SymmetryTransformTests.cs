@@ -332,8 +332,8 @@ public sealed class SymmetryTransformTests
 
     private static MethodInfo GetTransformMethod(string methodName)
     {
-        return typeof(TetrisSolver).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)
-               ?? throw new InvalidOperationException($"Expected private static method '{methodName}' in TetrisSolver.");
+        return typeof(PlacementSymmetry).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)
+               ?? throw new InvalidOperationException($"Expected private static method '{methodName}' in PlacementSymmetry.");
     }
 }
 

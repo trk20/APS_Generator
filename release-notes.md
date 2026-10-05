@@ -1,7 +1,8 @@
 # Recent Changes
 
-- Added FtD-native mod version in addition to the existing standalone UI (https://steamcommunity.com/sharedfiles/filedetails/?id=3808824333)
-- Fixed CMS bundling issue in linux version of standalone app
+- Faster solving through incremental optimization, smaller symmetry-aware coverage constraints, and improved placement conflict encoding - faster across tested scenarios by ~90%, about 10x faster overall.
+- Updated bundled CryptoMiniSat to 5.16.0
+- Increased the template size limit to 60 to account for 4-way symmetry 3-clip now being feasible above 50.
 
 <!-- install-start -->
 

@@ -96,7 +96,7 @@
 
                         <Grid ColumnDefinitions="*,Auto,*">
                             <NumericUpDown Grid.Column="0" Value="{Binding TemplateWidth}"
-                                           Minimum="3" Maximum="50" Increment="1" FormatString="0"
+                                           Minimum="3" Maximum="60" Increment="1" FormatString="0"
                                            ToolTip.Tip="Grid width" />
                             <ToggleButton Grid.Column="1" IsChecked="{Binding IsHeightLocked, Mode=TwoWay}"
                                           Content="⇔" FontSize="14" Padding="6,2"
@@ -104,7 +104,7 @@
                                           ToolTip.Tip="Lock dimensions together" />
                             <NumericUpDown Grid.Column="2" Value="{Binding TemplateHeight}"
                                            IsEnabled="{Binding IsHeightEditable}"
-                                           Minimum="3" Maximum="50" Increment="1" FormatString="0"
+                                           Minimum="3" Maximum="60" Increment="1" FormatString="0"
                                            ToolTip.Tip="Grid height" />
                         </Grid>
 

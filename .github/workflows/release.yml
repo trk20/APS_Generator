@@ -15,10 +15,12 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DOTNET_ROLL_FORWARD: Major
 
 jobs:
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,24 +35,55 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake ninja-build git patchelf \
-            libgmp-dev zlib1g-dev
+            build-essential cmake ninja-build git python3 pkg-config patchelf \
+            libgmp-dev zlib1g-dev squashfs-tools
 
-      - name: Build CryptoMiniSat from source
+      - name: Build CryptoMiniSat with benchmarked dependency revisions
         run: |
-          cd native/cryptominisat
-          cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
+          python3 - <<'PYTHON'
+          import json, shutil
+          from pathlib import Path
+          versions = json.loads(Path('native/versions.json').read_text())
+          source = Path('native/build/source')
+          shutil.copytree('native/cryptominisat', source, dirs_exist_ok=True,
+                          ignore=shutil.ignore_patterns('.git', 'build'))
+          cmake = source / 'CMakeLists.txt'
+          pins = ['include(FetchContent)']
+          for name in ('cadical', 'cadiback'):
+              pins.append(f'FetchContent_Declare({name} GIT_REPOSITORY https://github.com/meelgroup/{name} GIT_TAG {versions[name]} GIT_SHALLOW FALSE)')
+          content = cmake.read_text()
+          assert content.count('include(FetchContent)') == 1
+          cmake.write_text(content.replace('include(FetchContent)', '\n'.join(pins)))
+          implementation = source / 'src/cryptominisat.cpp'
+          content = implementation.read_text().replace('#include "cadical_gitsha1.hpp"', '')
+          for name, namespace in (('cadical', 'CaDiCaL'), ('cadiback', 'CadiBack')):
+              accessor = f'return {namespace}::get_version_sha1();'
+              assert accessor in content
+              content = content.replace(accessor, f'return "{versions[name]}";')
+          implementation.write_text(content)
+          template = source / 'src/GitSHA1.cpp.in'
+          template.write_text(template.read_text().replace('@GIT_SHA1@', versions['cryptominisat']))
+          PYTHON
+          cmake -S native/build/source -B native/build/cms -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+            -DENABLE_TESTING=OFF -DSTATS=OFF -DNOBREAKID=ON \
             -DBUILD_PYTHON_EXTENSION=OFF
-          cmake --build build --target cryptominisat5
+          cmake --build native/build/cms --target cryptominisat5 --parallel 4
 
       - name: Copy CMS shared library and dependencies to runtimes
         run: |
           DEST="src/ApsGenerator.Solver/runtimes/linux-x64/native"
-          BUILD_ROOT=$(realpath native/cryptominisat/build)
+          BUILD_ROOT=$(realpath native/build/cms)
           CMS_LIBRARY="$BUILD_ROOT/lib/libcryptominisat5.so"
           mkdir -p "$DEST"
+          find "$DEST" -maxdepth 1 -type f -name '*.so*' -delete
           cp -L "$CMS_LIBRARY" "$DEST/libcryptominisat5.so"
+          # Refresh both GMP files even when CMS does not import them directly;
+          # the mod bootstrap loads them and the source notice must match them.
+          for soname in libgmp.so.10 libgmpxx.so.4; do
+            dependency_path=$(ldconfig -p | awk -v name="$soname" '$1 == name && !found { print $NF; found=1 }')
+            cp -L "$dependency_path" "$DEST/$soname"
+          done
 
           # CryptoMiniSat's fetched CaDiCaL/CaDiBaCk revisions may build either
           # static or shared libraries. Recursively package any shared build
@@ -104,7 +137,11 @@ jobs:
           ls -la "$DEST"
 
       - name: Run tests
-        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=RegressionBenchmark&Category!=Slow'
+        run: |
+          for project in tests/ApsGenerator.Core.Tests tests/ApsGenerator.Solver.Tests tests/ApsGenerator.UI.Tests; do
+            timeout 600 dotnet test "$project" -c Release -m:1 /nodeReuse:false -p:UseSharedCompilation=false \
+              --filter 'Category!=DataCollection&Category!=Benchmark&Category!=RegressionBenchmark&Category!=Slow'
+          done
 
       - name: Publish
         run: >
@@ -121,6 +158,7 @@ jobs:
               exit 1
             fi
 
+            cmp "$source_library" "$library"
             echo "Checking $(basename "$library")"
             dependency_report=$(ldd "$library")
             echo "$dependency_report"
@@ -130,7 +168,7 @@ jobs:
           done
 
       - name: Install vpk
-        run: dotnet tool install -g vpk
+        run: dotnet tool install -g vpk --version 0.0.1298
 
       - name: Package
         run: >
@@ -144,6 +182,7 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -161,25 +200,50 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
-            mingw-w64-x86_64-gcc mingw-w64-x86_64-binutils mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja make mingw-w64-x86_64-gmp mingw-w64-x86_64-zlib mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-gcc mingw-w64-x86_64-binutils mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja make mingw-w64-x86_64-gmp mingw-w64-x86_64-zlib mingw-w64-x86_64-pkgconf mingw-w64-x86_64-python
 
 
-      - name: Build CryptoMiniSat from source
+      - name: Build CryptoMiniSat with benchmarked dependency revisions
         shell: msys2 {0}
         run: |
-          cd native/cryptominisat
-          cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
+          python - <<'PYTHON'
+          import json, shutil
+          from pathlib import Path
+          versions = json.loads(Path('native/versions.json').read_text())
+          source = Path('native/build/source')
+          shutil.copytree('native/cryptominisat', source, dirs_exist_ok=True,
+                          ignore=shutil.ignore_patterns('.git', 'build'))
+          cmake = source / 'CMakeLists.txt'
+          pins = ['include(FetchContent)']
+          for name in ('cadical', 'cadiback'):
+              pins.append(f'FetchContent_Declare({name} GIT_REPOSITORY https://github.com/meelgroup/{name} GIT_TAG {versions[name]} GIT_SHALLOW FALSE)')
+          content = cmake.read_text()
+          assert content.count('include(FetchContent)') == 1
+          cmake.write_text(content.replace('include(FetchContent)', '\n'.join(pins)))
+          implementation = source / 'src/cryptominisat.cpp'
+          content = implementation.read_text().replace('#include "cadical_gitsha1.hpp"', '')
+          for name, namespace in (('cadical', 'CaDiCaL'), ('cadiback', 'CadiBack')):
+              accessor = f'return {namespace}::get_version_sha1();'
+              assert accessor in content
+              content = content.replace(accessor, f'return "{versions[name]}";')
+          implementation.write_text(content)
+          template = source / 'src/GitSHA1.cpp.in'
+          template.write_text(template.read_text().replace('@GIT_SHA1@', versions['cryptominisat']))
+          PYTHON
+          cmake -S native/build/source -B native/build/cms -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+            -DENABLE_TESTING=OFF -DSTATS=OFF -DNOBREAKID=ON \
             -DBUILD_PYTHON_EXTENSION=OFF \
             -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++"
-          cmake --build build --target cryptominisat5
+          cmake --build native/build/cms --target cryptominisat5 --parallel 4
 
       - name: Copy CMS DLL and dependencies to runtimes
         shell: msys2 {0}
         run: |
           DEST="src/ApsGenerator.Solver/runtimes/win-x64/native"
           mkdir -p "$DEST"
-          DLL="native/cryptominisat/build/cmsat5-src/libcryptominisat5win.dll"
+          find "$DEST" -maxdepth 1 -type f -name '*.dll' -delete
+          DLL="native/build/cms/cmsat5-src/libcryptominisat5win.dll"
           cp "$DLL" "$DEST/cryptominisat5.dll"
           # Recursively package non-system DLLs from the build and MinGW runtime.
           pending=("$DEST/cryptominisat5.dll")
@@ -187,7 +251,7 @@ jobs:
             binary=${pending[0]}
             pending=("${pending[@]:1}")
             while read -r dependency; do
-              dependency_path=$(find native/cryptominisat/build /mingw64/bin \
+              dependency_path=$(find native/build/cms /mingw64/bin \
                 -type f -iname "$dependency" -print -quit)
               if [[ -z "$dependency_path" ]]; then
                 case "${dependency,,}" in
@@ -226,17 +290,33 @@ jobs:
 
       - name: Run tests
         shell: pwsh
-        env:
-          PATH: ${{ github.workspace }}\src\ApsGenerator.Solver\runtimes\win-x64\native;${{ env.PATH }}
-        run: dotnet test --filter 'Category!=DataCollection&Category!=Benchmark&Category!=RegressionBenchmark&Category!=Slow'
+        run: |
+          $nativeDir = Join-Path $env:GITHUB_WORKSPACE 'src/ApsGenerator.Solver/runtimes/win-x64/native'
+          $env:PATH = "$nativeDir;$env:PATH"
+          foreach ($project in @('tests/ApsGenerator.Core.Tests', 'tests/ApsGenerator.Solver.Tests', 'tests/ApsGenerator.UI.Tests')) {
+            dotnet test $project -c Release -m:1 /nodeReuse:false -p:UseSharedCompilation=false --filter 'Category!=DataCollection&Category!=Benchmark&Category!=RegressionBenchmark&Category!=Slow'
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Publish
         run: >
           dotnet publish src/ApsGenerator.UI/ApsGenerator.UI.csproj -c Release -r win-x64 --self-contained -p:Version=${{ inputs.version }}
 
 
+      - name: Verify packaged Windows native dependencies
+        shell: pwsh
+        run: |
+          $nativeDir = 'src/ApsGenerator.Solver/runtimes/win-x64/native'
+          $publishDir = 'src/ApsGenerator.UI/bin/Release/net10.0/win-x64/publish'
+          foreach ($source in Get-ChildItem "$nativeDir/*.dll") {
+            $packaged = Join-Path $publishDir $source.Name
+            if (!(Test-Path $packaged) -or (Get-FileHash $source.FullName).Hash -ne (Get-FileHash $packaged).Hash) {
+              throw "Missing or mismatched published native library: $($source.Name)"
+            }
+          }
+
       - name: Install vpk
-        run: dotnet tool install -g vpk
+        run: dotnet tool install -g vpk --version 0.0.1298
 
       - name: Package
         run: >
@@ -250,7 +330,7 @@ jobs:
 
   release:
     needs: [build-linux, build-windows]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
@@ -262,7 +342,7 @@ jobs:
           dotnet-quality: "ga"
 
       - name: Install vpk
-        run: dotnet tool install -g vpk
+        run: dotnet tool install -g vpk --version 0.0.1298
 
       - uses: actions/download-artifact@v4
         with:
