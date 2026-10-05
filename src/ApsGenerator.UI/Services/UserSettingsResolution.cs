@@ -8,7 +8,7 @@ namespace ApsGenerator.UI.Services;
 internal static class UserSettingsResolution
 {
     private const int MinTemplateDimension = 3;
-    private const int MaxTemplateDimension = 50;
+    private const int MaxTemplateDimension = 60;
     private const double MinSolverSeconds = 1;
     private const double MaxSolverSeconds = 600;
 

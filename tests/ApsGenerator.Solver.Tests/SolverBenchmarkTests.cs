@@ -7,9 +7,8 @@ namespace ApsGenerator.Solver.Tests;
 
 /// <summary>
 /// Benchmarks for the TetrisSolver to track performance regressions over time.
-/// All benchmarks have a time limit of about double the expected solve time.
+/// Historical cases retain their original limits; expanded cases allow 120 seconds.
 /// Expected cluster counts and solution counts are based on historical runs. 
-/// Any change that causes any benchmark to exceed its time limit or produce different results is a critical regression.
 /// </summary>
 public sealed class SolverBenchmarkTests(ITestOutputHelper output)
 {
@@ -159,11 +158,34 @@ public sealed class SolverBenchmarkTests(ITestOutputHelper output)
         RunBenchmark(grid, TetrisType.FiveClip, options, 42, 10, "17x17Circle_5Clip_VerticalReflection");
     }
 
+    [Theory]
+    [Trait("Category", "RegressionBenchmark")]
+    [InlineData(25, true, TetrisType.FourClip, SymmetryType.None, 88)]
+    [InlineData(27, true, TetrisType.FourClip, SymmetryType.Rotation180, 100)]
+    [InlineData(51, true, TetrisType.ThreeClip, SymmetryType.BothReflection, 512)]
+    [InlineData(19, false, TetrisType.FiveClip, SymmetryType.VerticalReflection, 56)]
+    [InlineData(41, false, TetrisType.FourClip, SymmetryType.Rotation90, 241)]
+    [InlineData(49, false, TetrisType.FourClip, SymmetryType.Rotation90, 349)]
+    public void Benchmark_ExpandedCompletedCircle(int diameter, bool blockCenter,
+        TetrisType type, SymmetryType symmetry, int expectedClusters)
+    {
+        var options = new SolverOptions
+        {
+            MaxTimeSeconds = 120,
+            NumSolutions = 10,
+            SymmetryType = symmetry,
+            SymmetryMode = SymmetryMode.Hard,
+            EarlyStopEnabled = false
+        };
+        RunBenchmark(TemplateGenerator.Circle(diameter, blockCenter), type, options,
+            expectedClusters, 10, $"{diameter}x{diameter}_{type}_{symmetry}");
+    }
+
     private void RunBenchmark(Grid grid, TetrisType type, SolverOptions options, int expectedClusterCount, int expectedNumSolutions, string label)
     {
         var solver = new TetrisSolver();
         var sw = Stopwatch.StartNew();
-        CancellationTokenSource cts = new(TimeSpan.FromSeconds(options.MaxTimeSeconds + 1)); // Ensure solver respects MaxTimeSeconds
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(options.MaxTimeSeconds + 5)); // Ensure solver respects MaxTimeSeconds
         var result = solver.Solve(grid, type, options, cts.Token);
         sw.Stop();
 

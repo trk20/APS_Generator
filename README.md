@@ -110,7 +110,7 @@ Cells follow symmetry rules if enabled.
 | Hard Symmetry | ![hard-result](readme-images/reflexive-symmetry.png) |
 | Soft Symmetry | ![soft-result](readme-images/soft-symmetry.png) |
 
-- **Number of Solutions** - Set how many distinct solutions the solver should generate before stopping. The solver will attempt to find multiple unique layouts that meet the specified parameters (note - this is significantly faster than generating multiple times, around ~50% extra time for 10 solutions instead of 1). After generating, you can cycle through the different solutions using the left and right arrow buttons above the result display. If less unique solutions exist than the number requested, the solver will return all unique solutions.
+- **Number of Solutions** - Set how many distinct solutions the solver should generate before stopping. The solver will attempt to find multiple unique layouts that meet the specified parameters (this reuses the packing constraints and is usually faster than running separate generations). After generating, you can cycle through the different solutions using the left and right arrow buttons above the result display. If less unique solutions exist than the number requested, the solver will return all unique solutions.
 - **Show Cooler Snake** - toggle the visibility of the cooler snake on the grid.
 
 ![cooler-snake](readme-images/cooler-snake.png)
@@ -125,7 +125,7 @@ Access additional settings in the **Settings** menu:
 
 - **Thread Count** - Adjust the number of threads used for solving. More threads can speed up solving, especially for larger grids and higher clip counts, but will increase CPU usage.
 - **Max Time** - Set a maximum time limit for the solver to run. If the solver exceeds this time, it will stop and return the best solution found so far.
-- **Early Stop Heuristic** - Enable an experimental heuristic that can significantly reduce solve time in some cases by stopping early when a solution is found that meets certain criteria. In testing this reduced solve time by around 40% on average with a ~5% chance of missing the optimal solution.
+- **Early Stop Heuristic** - Enable an experimental heuristic that can significantly reduce solve time in some cases by stopping early when a solution is found that meets certain criteria. This can return a feasible layout before optimality is proved; the benefit and possible density loss depend on the template.
 - **Default Export Clip/Loader Length** - Set the default clip and loader lengths for exported blueprints using 3 and 4-clip tetris.
 - **Default Export Stack Height** - Set the default stack height for exported blueprints using 5-clip tetris.
 - **Export Name Template** - Set a default naming template for exported blueprints. You can use the following tokens in the name template, which will be replaced with the corresponding values from the generated solution:
@@ -152,7 +152,7 @@ When the solver finishes, it shows the final cluster count, solution status, tim
 Statuses include:
 
 - **Optimal** - The solver proved that the solution is optimal.
-- **Likely Optimal** - The early stop heuristic was triggered, so the solver stopped before proving optimality. Small chance that a better solution exists.
+- **Likely Optimal** - The early stop heuristic was triggered, so the solver stopped before proving optimality. A better solution may exist.
 - **Density Target Met** - The solver found a solution that meets the specified target density.
 - **Timed Out** - The solver exceeded the maximum time limit. The best solution found so far is returned, but it may not be optimal.
 - **Cancelled** - The solve was cancelled prematurely by the user and no solution was returned.
@@ -179,9 +179,9 @@ The generated blueprint should now be available in-game. If you can't find it, c
 - 3-clip solves much faster than 4-clip and 5-clip.
 - Hard reflexive symmetry (Horizontal or Vertical) is recommended for 5-clip. Rotational symmetry is not recommended for 5-clip as it interferes with optimal arrangements.
 - 180° rotational symmetry is recommended for 4-clip with the center hole template.
-- If you find that you don't like the generated solution, try changing the number of solutions to generate and see if you get a different layout you prefer. Generating multiple solutions is much faster than generating multiple times and is guaranteed\* to give you unique layouts that meet the same parameters.
+- If you find that you don't like the generated solution, try changing the number of solutions to generate and see if you get a different layout you prefer. Generating multiple solutions is much faster than generating multiple times and returns distinct layouts with the same cluster count and coverage.
 
-> \* : Can produce the same solution in some cases when target density is set to less than 100% - otherwise, all solutions will always be unique.</br> If less unique solutions exist than the number requested, the solver will return all unique solutions and stop.
+If fewer distinct layouts exist than requested, or the time budget expires, the solver returns the layouts found so far.
 
 ---
 
@@ -197,6 +197,8 @@ Contributions are welcome!
   4. Open a PR against the main branch with a clear description.
 
 For development, you'll need .NET 10 SDK and familiarity with [Avalonia UI](https://docs.avaloniaui.net/) - the project uses Avalonia 11 for its cross-platform desktop UI.
+
+See [mod development](mod-development.md), and [solver benchmarks](benchmarks/README.md) for build and validation details.
 
 ## Acknowledgements
 

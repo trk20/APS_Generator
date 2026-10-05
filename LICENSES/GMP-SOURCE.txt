@@ -1,10 +1,5 @@
-GNU MP 6.3.0 corresponding source
-=================================
-
-The checked-in Linux x64 libgmp.so.10 and libgmpxx.so.4 files came from the
-CachyOS gmp package version 6.3.0-3.1. The corresponding upstream source is:
-
-https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
-
-Release automation replaces this file with the exact Ubuntu source-package
-version and source location for the GMP binaries included in that release.
+GNU MP corresponding source
+===========================
+These binaries use Ubuntu 22.04 source package gmp 2:6.2.1+dfsg-3ubuntu1.
+Corresponding source, including Ubuntu packaging changes:
+https://launchpad.net/ubuntu/+source/gmp/2:6.2.1+dfsg-3ubuntu1

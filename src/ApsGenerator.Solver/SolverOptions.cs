@@ -23,7 +23,8 @@ public sealed record SolverOptions
     public int? TargetClusterCount { get; init; }
 
     /// <summary>
-    /// Number of distinct optimal solutions to enumerate via blocking clauses.
+    /// Number of distinct solutions to enumerate at the returned cluster count.
+    /// Target and early-stop layouts share the first layout’s density so don't need to be optimal.
     /// The wall-clock budget is shared across all enumerations.
     /// </summary>
     public int NumSolutions { get; init; } = 1;

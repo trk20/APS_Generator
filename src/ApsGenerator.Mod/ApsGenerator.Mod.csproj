@@ -64,13 +64,9 @@
     <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/linux-x64/native/libgmpxx.so.4')"
            Text="The Linux GMP C++ runtime is missing." />
     <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/cryptominisat5.dll')"
-           Text="The Windows CryptoMiniSat library is missing. Run tools/build-windows-native.sh first." />
-    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/libcadiback.dll')"
-           Text="The Windows CaDiBack library is missing. Run tools/build-windows-native.sh first." />
-    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/libcadical.dll')"
-           Text="The Windows CaDiCaL library is missing. Run tools/build-windows-native.sh first." />
+           Text="The Windows CryptoMiniSat library is missing. Build the Windows runtime with your local native build helpers first." />
     <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/libwinpthread-1.dll')"
-           Text="The Windows MinGW threading runtime is missing. Run tools/build-windows-native.sh first." />
+           Text="The Windows MinGW threading runtime is missing. Build the Windows runtime with your local native build helpers first." />
 
     <ItemGroup>
       <_ModManagedFiles Include="$(TargetDir)ApsGenerator.Core.dll" />

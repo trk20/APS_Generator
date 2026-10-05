@@ -15,11 +15,11 @@
   </PropertyGroup>
 
   <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('linux')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOsPlatform('Linux')))">
-    <None Include="runtimes/linux-x64/native/*.so*" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+    <None Include="runtimes/linux-x64/native/*.so*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" Link="%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('win')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOsPlatform('Windows')))">
-    <None Include="runtimes/win-x64/native/*.dll" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+    <None Include="runtimes/win-x64/native/*.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" Link="%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

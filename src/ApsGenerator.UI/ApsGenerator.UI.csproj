@@ -2,11 +2,27 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <Version>2.4.0</Version>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationIcon>Assets/Icons/icon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <NativeRuntimeIdentifier>$(RuntimeIdentifier)</NativeRuntimeIdentifier>
+    <NativeRuntimeIdentifier Condition="'$(NativeRuntimeIdentifier)' == '' And $([MSBuild]::IsOsPlatform('Linux'))">linux-x64</NativeRuntimeIdentifier>
+    <NativeRuntimeIdentifier Condition="'$(NativeRuntimeIdentifier)' == '' And $([MSBuild]::IsOsPlatform('Windows'))">win-x64</NativeRuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Referenced libraries can be built without the application's RID. Select
+         distributable native files here using the application's target. -->
+    <None Include="../ApsGenerator.Solver/runtimes/$(NativeRuntimeIdentifier)/native/*"
+          Link="%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.13" />

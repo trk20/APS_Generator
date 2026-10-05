@@ -29,4 +29,12 @@ x86/
 # Native libs build artifacts
 native/build/
 native/cryptominisat/build/
-src/ApsGenerator.Solver/runtimes/win-x64/
+
+# Env-specific helpers
+.containerignore
+tools/
+benchmarks/
+
+# Python caches
+__pycache__/
+*.pyc

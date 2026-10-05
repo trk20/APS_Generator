@@ -1,6 +1,6 @@
 {
   "name": "ApsGenerator",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "gameversion": "4.3.4.1",
   "filename": "0Harmony.dll,ApsGenerator.Core.dll,ApsGenerator.Solver.dll,ApsGenerator.Mod.dll",
   "depends": [],
