@@ -1,0 +1,176 @@
+name: macOS native runtime
+
+# Builds the universal (arm64 + x86_64) CryptoMiniSat library for the From the Depths mod.
+# Extract the "osx-native" artifact into src/ApsGenerator.Solver/runtimes/osx/native/ and
+# commit it before staging a mod release; StageModPackage refuses to stage without it.
+
+on:
+  workflow_dispatch:
+
+env:
+  MACOSX_DEPLOYMENT_TARGET: "11.0"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: brew install gmp ninja pkgconf
+
+      - name: Build CryptoMiniSat with benchmarked dependency revisions
+        run: |
+          python3 - <<'PYTHON'
+          import json, shutil
+          from pathlib import Path
+          versions = json.loads(Path('native/versions.json').read_text())
+          source = Path('native/build/source')
+          shutil.copytree('native/cryptominisat', source, dirs_exist_ok=True,
+                          ignore=shutil.ignore_patterns('.git', 'build'))
+          cmake = source / 'CMakeLists.txt'
+          pins = ['include(FetchContent)']
+          for name in ('cadical', 'cadiback'):
+              pins.append(f'FetchContent_Declare({name} GIT_REPOSITORY https://github.com/meelgroup/{name} GIT_TAG {versions[name]} GIT_SHALLOW FALSE)')
+          content = cmake.read_text()
+          assert content.count('include(FetchContent)') == 1
+          cmake.write_text(content.replace('include(FetchContent)', '\n'.join(pins)))
+          implementation = source / 'src/cryptominisat.cpp'
+          content = implementation.read_text().replace('#include "cadical_gitsha1.hpp"', '')
+          for name, namespace in (('cadical', 'CaDiCaL'), ('cadiback', 'CadiBack')):
+              accessor = f'return {namespace}::get_version_sha1();'
+              assert accessor in content
+              content = content.replace(accessor, f'return "{versions[name]}";')
+          implementation.write_text(content)
+          template = source / 'src/GitSHA1.cpp.in'
+          template.write_text(template.read_text().replace('@GIT_SHA1@', versions['cryptominisat']))
+          PYTHON
+          # GMP is needed for headers only; -dead_strip_dylibs drops the unused link,
+          # matching the Linux build where the linker omits it.
+          cmake -S native/build/source -B native/build/cms -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+            -DENABLE_TESTING=OFF -DSTATS=OFF -DNOBREAKID=ON -DNOZLIB=ON \
+            -DBUILD_PYTHON_EXTENSION=OFF \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-dead_strip_dylibs"
+          cmake --build native/build/cms --target cryptominisat5 --parallel 4
+
+      - name: Package library and build-tree dependencies
+        run: |
+          set -euo pipefail
+          BUILD_ROOT=$(cd native/build/cms && pwd -P)
+          DEST=native/build/osx-${{ matrix.arch }}
+          mkdir -p "$DEST"
+          cp -L "$BUILD_ROOT/lib/libcryptominisat5.dylib" "$DEST/libcryptominisat5.dylib"
+          chmod u+w "$DEST/libcryptominisat5.dylib"
+          install_name_tool -id @rpath/libcryptominisat5.dylib "$DEST/libcryptominisat5.dylib"
+
+          # Bundle any shared libraries produced by the build (for example CaDiCaL when it
+          # builds shared) beside the main library. Anything else must be a system library.
+          pending=("$DEST/libcryptominisat5.dylib")
+          while ((${#pending[@]})); do
+            binary=${pending[0]}
+            pending=("${pending[@]:1}")
+            while read -r dependency; do
+              name=$(basename "$dependency")
+              case "$dependency" in
+                /usr/lib/*|/System/*) continue ;;
+                @rpath/libcryptominisat5*.dylib|"$BUILD_ROOT"/lib/libcryptominisat5*.dylib) continue ;;
+              esac
+              resolved=$(find "$BUILD_ROOT" -name "$name" -print -quit)
+              if [[ -z "$resolved" ]]; then
+                echo "Unsupported non-system dependency $dependency of $(basename "$binary")." >&2
+                exit 1
+              fi
+              if [[ ! -e "$DEST/$name" ]]; then
+                cp -L "$resolved" "$DEST/$name"
+                chmod u+w "$DEST/$name"
+                install_name_tool -id "@loader_path/$name" "$DEST/$name"
+                pending+=("$DEST/$name")
+                echo "Bundled $name"
+              fi
+              install_name_tool -change "$dependency" "@loader_path/$name" "$binary"
+            done < <(otool -L "$binary" | tail -n +2 | awk '{print $1}')
+          done
+
+          for library in "$DEST"/*.dylib; do
+            codesign --force --sign - "$library"
+            echo "== $(basename "$library")"
+            otool -L "$library"
+            lipo -info "$library"
+          done
+
+      - name: Smoke test the C API
+        run: |
+          python3 - "native/build/osx-${{ matrix.arch }}/libcryptominisat5.dylib" <<'PYTHON'
+          import ctypes, sys
+          lib = ctypes.CDLL(sys.argv[1])
+          lib.cmsat_new.restype = ctypes.c_void_p
+          lib.cmsat_free.argtypes = [ctypes.c_void_p]
+          lib.cmsat_new_vars.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+          lib.cmsat_set_num_threads.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+          lib.cmsat_solve.argtypes = [ctypes.c_void_p]
+          lib.cmsat_solve.restype = ctypes.c_uint8
+          solver = lib.cmsat_new()
+          lib.cmsat_set_num_threads(solver, 2)
+          lib.cmsat_new_vars(solver, 3)
+          result = lib.cmsat_solve(solver)
+          lib.cmsat_free(solver)
+          assert result == 0, f"expected SAT (0), got {result}"
+          print("CryptoMiniSat C API smoke test passed")
+          PYTHON
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: osx-${{ matrix.arch }}
+          path: native/build/osx-${{ matrix.arch }}/
+
+  universal:
+    needs: build
+    runs-on: macos-14
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: osx-arm64
+          path: arm64
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: osx-x86_64
+          path: x86_64
+
+      - name: Merge into universal libraries
+        run: |
+          set -euo pipefail
+          mkdir -p universal
+          for library in arm64/*.dylib; do
+            name=$(basename "$library")
+            if [[ ! -f "x86_64/$name" ]]; then
+              echo "$name exists only in the arm64 build." >&2
+              exit 1
+            fi
+            lipo -create "$library" "x86_64/$name" -output "universal/$name"
+            codesign --force --sign - "universal/$name"
+            lipo -info "universal/$name"
+          done
+          for library in x86_64/*.dylib; do
+            [[ -f "universal/$(basename "$library")" ]] || { echo "$(basename "$library") exists only in the x86_64 build." >&2; exit 1; }
+          done
+          python3 -c "import ctypes; ctypes.CDLL('universal/libcryptominisat5.dylib').cmsat_new; print('Universal library loads')"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: osx-native
+          path: universal/
