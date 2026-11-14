@@ -106,16 +106,12 @@ public static class UserSettingsStore
         if (settings.SettingsVersion >= UserSettings.CurrentSettingsVersion)
             return settings;
 
-        var current = new UserSettings();
-        if (settings.SelectedSymmetryType == ApsGenerationDefaults.Legacy.DefaultSymmetryType)
-            settings.SelectedSymmetryType = current.SelectedSymmetryType;
-        if (settings.MaxTimeSeconds == ApsGenerationDefaults.Legacy.MaxTimeSeconds)
-            settings.MaxTimeSeconds = current.MaxTimeSeconds;
-        if (settings.EarlyStopEnabled == ApsGenerationDefaults.Legacy.EarlyStopEnabled)
-            settings.EarlyStopEnabled = current.EarlyStopEnabled;
+        (settings.SelectedSymmetryType, settings.MaxTimeSeconds, settings.EarlyStopEnabled) =
+            ApsGenerationDefaults.Legacy.MigrateSolverDefaults(
+                settings.SelectedSymmetryType, settings.MaxTimeSeconds, settings.EarlyStopEnabled);
         // The old thread default was every processor but one.
         if (settings.ThreadCount == ApsGenerationDefaults.MaximumThreadCount)
-            settings.ThreadCount = current.ThreadCount;
+            settings.ThreadCount = ApsGenerationDefaults.DefaultThreadCount;
         settings.SettingsVersion = UserSettings.CurrentSettingsVersion;
         return settings;
     }

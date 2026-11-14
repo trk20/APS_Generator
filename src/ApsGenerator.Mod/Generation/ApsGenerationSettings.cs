@@ -65,26 +65,38 @@ internal sealed class ApsGenerationSettings
 
     /// <summary>Largest width the current shape allows with <paramref name="symmetry"/> (and the current mode).</summary>
     internal int MaximumWidthFor(SymmetryType symmetry) =>
-        WidthLimitFor(symmetry, SymmetryMode, ApsSolveSizeLimits.Limit.Maximum);
+        WidthLimitFor(symmetry, ApsSolveSizeLimits.Limit.Maximum);
 
     /// <summary>Largest width before the large-solve warning with <paramref name="symmetry"/>.</summary>
     internal int RecommendedWidthFor(SymmetryType symmetry) =>
-        WidthLimitFor(symmetry, SymmetryMode, ApsSolveSizeLimits.Limit.Recommended);
+        WidthLimitFor(symmetry, ApsSolveSizeLimits.Limit.Recommended);
 
-    /// <summary>Largest width of the current shape and depth within <paramref name="limit"/>.</summary>
-    internal int WidthLimitFor(SymmetryType symmetry, SymmetryMode mode, ApsSolveSizeLimits.Limit limit)
+    /// <summary>
+    /// Largest width the width stepper can reach (respecting odd-size snapping) with the current
+    /// shape and depth that stays within <paramref name="limit"/>.
+    /// </summary>
+    private int WidthLimitFor(SymmetryType symmetry, ApsSolveSizeLimits.Limit limit)
     {
-        int cells = ApsSolveSizeLimits.CellBudget(TetrisType, symmetry, mode, limit);
-        int largest = MinimumTemplateDimension;
-        for (int width = MinimumTemplateDimension; width <= MaximumDimension; width++)
+        int largest = NormalizeHorizontalDimension(MinimumTemplateDimension, MinimumTemplateDimension);
+        for (int width = largest; width <= MaximumDimension; width++)
         {
-            var template = new ApsTemplate(TemplateShape, width, IsDepthLocked ? width : Depth, HoleShape,
-                NormalizeHoleSizeFor(width, requestedHoleSize));
-            if (template.AvailableCells > cells)
+            int reachable = NormalizeHorizontalDimension(width, MinimumTemplateDimension);
+            if (!Fits(reachable, IsDepthLocked ? reachable : Depth, symmetry, limit))
                 break;
-            largest = width;
+            largest = reachable;
         }
         return largest;
+    }
+
+    /// <summary>
+    /// Whether a template of this size, with the hole size <see cref="SetWidth"/> would pick for
+    /// <paramref name="width"/>, stays within <paramref name="limit"/>. 
+    /// </summary>
+    private bool Fits(int width, int depth, SymmetryType symmetry, ApsSolveSizeLimits.Limit limit)
+    {
+        var template = new ApsTemplate(TemplateShape, width, depth, HoleShape,
+            NormalizeHoleSizeFor(width, requestedHoleSize));
+        return template.AvailableCells <= ApsSolveSizeLimits.CellBudget(TetrisType, symmetry, SymmetryMode, limit);
     }
 
     internal void ResetToDefaults()
@@ -191,9 +203,23 @@ internal sealed class ApsGenerationSettings
     }
 
     /// <summary>False when one more width step would exceed the size limit for the current options.</summary>
-    internal bool CanIncreaseWidth => Width < MaximumDimension && !WouldBeTooLarge(Width + WidthStep, IsDepthLocked ? Width + WidthStep : Depth);
+    internal bool CanIncreaseWidth
+    {
+        get
+        {
+            int next = NormalizeHorizontalDimension(Width + WidthStep, MinimumTemplateDimension);
+            return next > Width && Fits(next, IsDepthLocked ? next : Depth, SymmetryType, ApsSolveSizeLimits.Limit.Maximum);
+        }
+    }
 
-    internal bool CanIncreaseDepth => !IsDepthLocked && Depth < MaximumDimension && !WouldBeTooLarge(Width, Depth + WidthStep);
+    internal bool CanIncreaseDepth
+    {
+        get
+        {
+            int next = NormalizeHorizontalDimension(Depth + WidthStep, MinimumDimension);
+            return !IsDepthLocked && next > Depth && Fits(Width, next, SymmetryType, ApsSolveSizeLimits.Limit.Maximum);
+        }
+    }
 
     internal void SetWidth(int width)
     {
@@ -356,14 +382,6 @@ internal sealed class ApsGenerationSettings
         return true;
     }
 
-    private bool WouldBeTooLarge(int width, int depth)
-    {
-        var template = new ApsTemplate(TemplateShape, Math.Min(width, MaximumDimension),
-            Math.Min(depth, MaximumDimension), HoleShape, HoleSize);
-        return ApsSolveSizeLimits.Classify(template.AvailableCells, TetrisType, SymmetryType, SymmetryMode) ==
-               ApsSolveSize.TooLarge;
-    }
-
     private static int NormalizeStep(int value, int minimum, int maximum, int step)
     {
         int clamped = Math.Clamp(value, minimum, maximum);
@@ -430,15 +448,13 @@ internal sealed class ApsSettingsData
     {
         if (data.SchemaVersion >= CurrentSchemaVersion)
             return data;
-        var current = new ApsSettingsData();
         var migrated = (ApsSettingsData)data.MemberwiseClone();
         migrated.SchemaVersion = CurrentSchemaVersion;
-        if (data.SymmetryType == ApsGenerationDefaults.Legacy.DefaultSymmetryType)
-            migrated.SymmetryType = current.SymmetryType;
-        if (data.MaxTimeSeconds == ApsGenerationDefaults.Legacy.MaxTimeSeconds)
-            migrated.MaxTimeSeconds = current.MaxTimeSeconds;
-        if (data.EarlyStopEnabled == ApsGenerationDefaults.Legacy.EarlyStopEnabled)
-            migrated.EarlyStopEnabled = current.EarlyStopEnabled;
+        (SymmetryType symmetry, double seconds, bool earlyStop) =
+            ApsGenerationDefaults.Legacy.MigrateSolverDefaults(data.SymmetryType, data.MaxTimeSeconds, data.EarlyStopEnabled);
+        migrated.SymmetryType = symmetry;
+        migrated.MaxTimeSeconds = (int)seconds;
+        migrated.EarlyStopEnabled = earlyStop;
         return migrated;
     }
 

@@ -35,8 +35,8 @@ public sealed class TetrisSolver
     }
 
     /// <summary>
-    /// Finds a layout with at least <paramref name="minimumClusters"/> clusters that differs from
-    /// every layout in <paramref name="excluded"/>. Returns an empty result with
+    /// Finds a layout with at least <paramref name="minimumClusters"/> clusters that does not
+    /// contain every placement of any layout in <paramref name="excluded"/>. Returns an empty result with
     /// <see cref="SolverStatus.NoSolution"/> when no such layout exists, or
     /// <see cref="SolverStatus.TimedOut"/> when none was found within the time limit.
     /// </summary>

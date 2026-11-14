@@ -31,6 +31,11 @@ internal sealed class ApsGenerationSession(IApsGenerationSolver solver) : IDispo
     internal bool IsBusy => operation is not null;
     internal bool IsRefreshing => operation?.Kind == OperationKind.Refresh;
     internal bool CanShowPrevious => position > 0;
+    /// <summary>
+    /// False after a timed-out Generate. Only the first layout can time out (Next keeps its
+    /// status), so this also covers stepping forward through the history.
+    /// </summary>
+    internal bool CanShowNext => Solution is { CanFindNext: true };
     internal double ElapsedSeconds => operation?.Elapsed.Elapsed.TotalSeconds ?? 0;
     internal double LastSolveSeconds => Solution?.SolveSeconds ?? 0;
 
@@ -48,12 +53,8 @@ internal sealed class ApsGenerationSession(IApsGenerationSolver solver) : IDispo
     /// </summary>
     internal void Next(ApsGenerationRequest request)
     {
-        if (IsBusy || Solution is not ApsSolution existing) return;
-        if (existing.Request.Problem != request.Problem)
-        {
-            Generate(request);
-            return;
-        }
+        if (IsBusy || !CanShowNext || Solution is not ApsSolution existing ||
+            existing.Request.Problem != request.Problem) return;
         pendingRefresh = null;
         if (position < history.Count - 1)
         {
@@ -68,7 +69,8 @@ internal sealed class ApsGenerationSession(IApsGenerationSolver solver) : IDispo
         }
         if (TakePrefetch(existing) is Prefetch ready)
         {
-            Start(token => UsePrefetch(ready, existing, request, token), OperationKind.Next, elapsed: ready.Elapsed);
+            Start(token => UsePrefetch(ready, existing, request, token), OperationKind.Next, elapsed: ready.Elapsed,
+                consumed: ready);
             return;
         }
         Start(token => solver.Next(existing, request, token), OperationKind.Next);
@@ -91,12 +93,12 @@ internal sealed class ApsGenerationSession(IApsGenerationSolver solver) : IDispo
 
     /// <summary>
     /// Waits for a prefetched solution (usually already finished) and adapts it to the current
-    /// prefab options. Falls back to a fresh search if the prefetch failed.
+    /// prefab options. Falls back to a fresh search if the prefetch failed. Cancellation and
+    /// disposal of the prefetch are handled by <see cref="Start"/>.
     /// </summary>
     private ApsSolution UsePrefetch(Prefetch ready, ApsSolution existing, ApsGenerationRequest request,
         CancellationToken token)
     {
-        CancellationTokenRegistration link = token.Register(ready.Cancellation.Cancel);
         ApsSolution next;
         try
         {
@@ -105,12 +107,6 @@ internal sealed class ApsGenerationSession(IApsGenerationSolver solver) : IDispo
         catch (Exception) when (!token.IsCancellationRequested)
         {
             return solver.Next(existing, request, token);
-        }
-        finally
-        {
-            // Unlink before disposing so a late Cancel can't reach a disposed source.
-            link.Dispose();
-            ready.Cancellation.Dispose();
         }
         token.ThrowIfCancellationRequested();
         if (next.NextLayoutOutcome != ApsNextLayoutOutcome.None)
@@ -212,12 +208,28 @@ internal sealed class ApsGenerationSession(IApsGenerationSolver solver) : IDispo
         Solution = null;
     }
 
+    /// <param name="consumed">
+    /// A prefetch handed to this operation. It's linked to the operation's cancellation here, not
+    /// inside <paramref name="solve"/>, so a cancel that lands before the task starts still stops it.
+    /// </param>
     private void Start(Func<CancellationToken, ApsSolution> solve, OperationKind kind, int targetIndex = -1,
-        Stopwatch? elapsed = null)
+        Stopwatch? elapsed = null, Prefetch? consumed = null)
     {
         var cancellation = new CancellationTokenSource();
         elapsed ??= Stopwatch.StartNew();
+        CancellationTokenRegistration link = consumed is null
+            ? default
+            : cancellation.Token.Register(consumed.Cancellation.Cancel);
         Task<ApsSolution> task = Task.Run(() => solve(cancellation.Token), cancellation.Token);
+        if (consumed is not null)
+        {
+            // Unlink before Abandon disposes the prefetch source, so a late Cancel can't reach it.
+            _ = task.ContinueWith(_ =>
+            {
+                link.Dispose();
+                Abandon(consumed);
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
         operation = new(task, cancellation, elapsed, revision, kind, targetIndex);
     }
 
@@ -227,7 +239,7 @@ internal sealed class ApsGenerationSession(IApsGenerationSolver solver) : IDispo
         if (exhausted || history.Count == 0 || Solution?.NextLayoutOutcome != ApsNextLayoutOutcome.None)
             return;
         ApsSolution current = history[^1];
-        if (current.Result.Placements.Count == 0)
+        if (!current.CanFindNext)
             return;
         if (prefetch is not null && prefetch.Matches(current))
             return;

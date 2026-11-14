@@ -11,6 +11,7 @@ internal interface IApsGeneratorHudController
     bool IsSolving { get; }
     bool HasCurrentSolution { get; }
     bool CanShowPrevious { get; }
+    bool CanShowNext { get; }
     bool HasActivePrefab { get; }
     float SolveElapsedSeconds { get; }
     void Generate();
@@ -21,7 +22,9 @@ internal interface IApsGeneratorHudController
     void ResetDefaults();
     void Save();
     void Clear();
-    void ChangeSettings(Action change);
+    /// <param name="persist">False during a drag, calls <see cref="PersistSettings"/> when it ends.</param>
+    void ChangeSettings(Action change, bool persist = true);
+    void PersistSettings();
     void ClaimHudInput();
 }
 
@@ -67,10 +70,17 @@ internal sealed class ApsGeneratorHud : IDisposable
     private SelectorKind expandedSelector;
     private float scale = 1;
     private float stylesScale = -1;
+    private Texture2D? panelTexture;
+    private Texture2D? cardTexture;
+    private Texture2D? buttonTexture;
+    private Texture2D? hoverTexture;
+    private Texture2D? accentTexture;
+    private Texture2D? hoverAccentTexture;
+    private Texture2D? selectedTexture;
     private Texture2D? warningChip;
     private Texture2D? dangerChip;
-    private Texture2D? sliderTrack;
-    private Texture2D? sliderFill;
+    private Texture2D? zoomOutIcon;
+    private Texture2D? zoomInIcon;
     private GUIStyle? panelStyle;
     private GUIStyle? cardStyle;
     private GUIStyle? buttonStyle;
@@ -83,18 +93,15 @@ internal sealed class ApsGeneratorHud : IDisposable
     private GUIStyle? detailStyle;
     private GUIStyle? chipStyle;
     private GUIStyle? speedStyle;
-    private Texture2D? zoomOutIcon;
-    private Texture2D? zoomInIcon;
     private bool draggingDensity;
 
     internal Rect Draw(IApsGeneratorHudController controller)
     {
         ApsGenerationSettings settings = controller.Settings;
         ApsSolveSize size = settings.SolveSize;
-        float logicalHeight = PanelHeight;
         scale = CalculateScale(settings.HudScalePercent);
         EnsureStyles();
-        Rect rect = CalculatePanelRect(logicalHeight);
+        Rect rect = CalculatePanelRect();
         GuiState previous = GuiState.Capture();
         try
         {
@@ -128,9 +135,8 @@ internal sealed class ApsGeneratorHud : IDisposable
 
     private void DrawPanel(IApsGeneratorHudController controller, ApsSolveSize size, float width, float height)
     {
-        const float bodyTop = HeaderHeight;
-        Rect[] columns = CalculateColumns(width, bodyTop);
-        var selectors = CreateSelectors(columns, controller.Settings, height);
+        Rect[] columns = CalculateColumns(width);
+        var selectors = CreateSelectors(columns, controller.Settings, height, expandedSelector);
         DismissDropdownOnOutsideClick(selectors, controller);
         DrawHeader(controller, width);
 
@@ -139,8 +145,8 @@ internal sealed class ApsGeneratorHud : IDisposable
         DrawTetrisOptionsCard(columns[1], selectors, controller);
         DrawPrefabCard(columns[2], selectors, controller);
         DrawSolveSettingsCard(columns[3], controller);
-        DrawActions(controller, width, bodyTop + BodyHeight + 6, size);
-        DrawSizeControls(controller, width, bodyTop + BodyHeight + 6);
+        DrawActions(controller, width, HeaderHeight + BodyHeight + 6, size);
+        DrawSizeControls(controller, width, HeaderHeight + BodyHeight + 6);
         GUI.enabled = previousEnabled;
         DrawExpandedSelector(selectors, controller);
     }
@@ -174,13 +180,14 @@ internal sealed class ApsGeneratorHud : IDisposable
         else if (size == ApsSolveSize.TooLarge)
         {
             GUI.enabled = false;
-            DrawButton(primary, new GUIContent("TOO LARGE"),
-                () => { }, controller, primaryButtonStyle!);
+            GUI.Box(Scaled(primary), "TOO LARGE", primaryButtonStyle!);
             GUI.enabled = previousEnabled && idle;
         }
-        else if (controller.HasCurrentSolution)
+        else if (controller.CanShowNext)
             DrawButton(primary, new GUIContent("NEXT SOLUTION", "Find a different solution at the same density"),
                 controller.NextLayout, controller, primaryButtonStyle!);
+        else if (controller.HasCurrentSolution)
+            DrawButton(primary, new GUIContent("REGENERATE"), controller.Generate, controller, primaryButtonStyle!);
         else
             DrawButton(primary, new GUIContent("GENERATE"), controller.Generate, controller, primaryButtonStyle!);
 
@@ -244,7 +251,6 @@ internal sealed class ApsGeneratorHud : IDisposable
             controller);
     }
 
-    /// <summary>Filled tag beside the card title: SLOW above the recommended size, MAX n at the limit.</summary>
     /// <summary>HUD size controls, bottom right on the action row.</summary>
     private void DrawSizeControls(IApsGeneratorHudController controller, float width, float actionY)
     {
@@ -277,6 +283,7 @@ internal sealed class ApsGeneratorHud : IDisposable
         GUI.enabled = previousEnabled;
     }
 
+    /// <summary>Filled tag beside the card title: SLOW above the recommended size, MAX n at the limit.</summary>
     private void DrawSizeChip(Rect card, ApsGenerationSettings settings, ApsSolveSize size)
     {
         if (size == ApsSolveSize.Normal)
@@ -406,7 +413,7 @@ internal sealed class ApsGeneratorHud : IDisposable
     ];
 
     private static IReadOnlyDictionary<SelectorKind, Selector> CreateSelectors(
-        Rect[] columns, ApsGenerationSettings settings, float panelHeight) =>
+        Rect[] columns, ApsGenerationSettings settings, float panelHeight, SelectorKind expanded) =>
         new Dictionary<SelectorKind, Selector>
         {
             [SelectorKind.Template] = CreateSelector(
@@ -416,14 +423,15 @@ internal sealed class ApsGeneratorHud : IDisposable
                  new Choice<ApsTemplateShape>("Rectangle", ApsTemplateShape.Rectangle)],
                 settings.TemplateShape, settings.SetTemplateShape),
             // Each option quotes the largest size it allows, which shows how much faster
-            // symmetric solves are without needing a separate explanation.
+            // symmetric solves are without needing a separate explanation. Only computed while
+            // the list is open.
             [SelectorKind.Symmetry] = CreateSelector(
                 SymmetrySelectorRect(columns[1]),
                 SymmetryChoices(settings),
                 settings.SymmetryType, settings.SetSymmetryType,
-                symmetry => settings.MaximumWidthFor(symmetry) >= ApsGenerationSettings.MaximumDimension
-                    ? "no limit"
-                    : $"up to {settings.MaximumWidthFor(symmetry)}",
+                expanded == SelectorKind.Symmetry
+                    ? (symmetry => SymmetryLimitLabel(settings, symmetry))
+                    : null,
                 columns[1].width - 18),
             [SelectorKind.Tetris] = CreateSelector(
                 TetrisSelectorRect(columns[1]),
@@ -437,6 +445,12 @@ internal sealed class ApsGeneratorHud : IDisposable
                     .Select(layers => new Choice<ExportExtraLayers>(LayerLabel(layers), layers)).ToArray(),
                 settings.ExtraLayers, settings.SetExtraLayers)
         }.ToDictionary(pair => pair.Key, pair => pair.Value.FitWithin(panelHeight));
+
+    private static string SymmetryLimitLabel(ApsGenerationSettings settings, SymmetryType symmetry)
+    {
+        int maximum = settings.MaximumWidthFor(symmetry);
+        return maximum >= ApsGenerationSettings.MaximumDimension ? "no limit" : $"up to {maximum}";
+    }
 
     private void DrawExpandedSelector(IReadOnlyDictionary<SelectorKind, Selector> selectors, IApsGeneratorHudController controller)
     {
@@ -513,8 +527,8 @@ internal sealed class ApsGeneratorHud : IDisposable
         float fraction = Mathf.InverseLerp(ApsGenerationSettings.MinimumDensityPercent,
             ApsGenerationSettings.MaximumDensityPercent, settings.TargetDensityPercent);
         var track = new Rect(slider.x, slider.center.y - 2.5f, slider.width, 5);
-        GUI.DrawTexture(Scaled(track), sliderTrack!);
-        GUI.DrawTexture(Scaled(new Rect(track.x, track.y, thumbWidth / 2 + travel * fraction, track.height)), sliderFill!);
+        GUI.DrawTexture(Scaled(track), buttonTexture!);
+        GUI.DrawTexture(Scaled(new Rect(track.x, track.y, thumbWidth / 2 + travel * fraction, track.height)), selectedTexture!);
         bool enabled = GUI.enabled && expandedSelector == SelectorKind.None;
         var thumb = new Rect(slider.x + travel * fraction, slider.center.y - 9, thumbWidth, 18);
         GUI.DrawTexture(Scaled(thumb), draggingDensity ? hoverAccentTexture! : accentTexture!);
@@ -530,6 +544,7 @@ internal sealed class ApsGeneratorHud : IDisposable
             draggingDensity = false;
             if (current.type == EventType.MouseUp)
                 controller.ClaimHudInput();
+            controller.PersistSettings();
             return;
         }
 
@@ -541,7 +556,7 @@ internal sealed class ApsGeneratorHud : IDisposable
         if (current.type is EventType.MouseDown or EventType.MouseDrag)
             controller.ClaimHudInput();
         if (snapped != settings.TargetDensityPercent)
-            controller.ChangeSettings(() => settings.SetTargetDensityPercent(snapped));
+            controller.ChangeSettings(() => settings.SetTargetDensityPercent(snapped), persist: false);
     }
 
     private void DrawDimensionPair(Rect rect, ApsGenerationSettings settings, IApsGeneratorHudController controller,
@@ -726,8 +741,7 @@ internal sealed class ApsGeneratorHud : IDisposable
 
     private void Label(Rect rect, GUIContent content, GUIStyle style) => GUI.Label(Scaled(rect), content, style);
 
-
-    private static Rect[] CalculateColumns(float panelWidth, float bodyTop)
+    private static Rect[] CalculateColumns(float panelWidth)
     {
         float contentWidth = panelWidth - Padding * 2 - Gap * 3;
         float desiredWidth = TemplateCardWidth + TetrisOptionsCardWidth + PrefabCardWidth + SolveSettingsCardWidth;
@@ -739,10 +753,10 @@ internal sealed class ApsGeneratorHud : IDisposable
         float x = Padding;
         return
         [
-            new Rect(x, bodyTop, templateWidth, BodyHeight),
-            new Rect(x += templateWidth + Gap, bodyTop, tetrisOptionsWidth, BodyHeight),
-            new Rect(x += tetrisOptionsWidth + Gap, bodyTop, prefabWidth, BodyHeight),
-            new Rect(x + prefabWidth + Gap, bodyTop, solveSettingsWidth, BodyHeight)
+            new Rect(x, HeaderHeight, templateWidth, BodyHeight),
+            new Rect(x += templateWidth + Gap, HeaderHeight, tetrisOptionsWidth, BodyHeight),
+            new Rect(x += tetrisOptionsWidth + Gap, HeaderHeight, prefabWidth, BodyHeight),
+            new Rect(x + prefabWidth + Gap, HeaderHeight, solveSettingsWidth, BodyHeight)
         ];
     }
 
@@ -806,10 +820,10 @@ internal sealed class ApsGeneratorHud : IDisposable
         return Mathf.Clamp(Mathf.Min(desired, fitsWidth), 0.5f, MaximumScale);
     }
 
-    private Rect CalculatePanelRect(float logicalHeight)
+    private Rect CalculatePanelRect()
     {
         float width = Mathf.Min(Screen.width - 2 * PanelMargin, MaximumPanelWidth * scale);
-        float height = Mathf.Min(logicalHeight * scale, Screen.height - 2 * PanelMargin);
+        float height = Mathf.Min(PanelHeight * scale, Screen.height - 2 * PanelMargin);
         return new Rect((Screen.width - width) / 2, Screen.height - height - PanelMargin, width, height);
     }
 
@@ -830,20 +844,12 @@ internal sealed class ApsGeneratorHud : IDisposable
         valueStyle = CreateLabelStyle(14, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
         valueStyle.padding = new RectOffset(0, 0, 0, 0);
         bodyStyle = CreateLabelStyle(13, FontStyle.Normal, TextAnchor.MiddleLeft, Color.white);
-        mutedStyle = CreateLabelStyle(12, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.68f, 0.78f, 0.82f));
+        mutedStyle = CreateLabelStyle(12, FontStyle.Normal, TextAnchor.MiddleLeft, MutedColor);
         speedStyle = CreateLabelStyle(12, FontStyle.Italic, TextAnchor.MiddleCenter, FastColor);
         detailStyle = CreateLabelStyle(11, FontStyle.Normal, TextAnchor.MiddleRight, new Color(0.80f, 0.88f, 0.90f));
         chipStyle = CreateLabelStyle(11, FontStyle.Bold, TextAnchor.MiddleCenter, Color.black);
         chipStyle.padding = new RectOffset(0, 0, 0, 0);
     }
-
-    private Texture2D? panelTexture;
-    private Texture2D? cardTexture;
-    private Texture2D? buttonTexture;
-    private Texture2D? hoverTexture;
-    private Texture2D? accentTexture;
-    private Texture2D? hoverAccentTexture;
-    private Texture2D? selectedTexture;
 
     private void CreateTextures()
     {
@@ -858,8 +864,6 @@ internal sealed class ApsGeneratorHud : IDisposable
         dangerChip = CreateTexture(DangerColor);
         zoomOutIcon = CreateMagnifierIcon(plus: false);
         zoomInIcon = CreateMagnifierIcon(plus: true);
-        sliderTrack = buttonTexture;
-        sliderFill = selectedTexture;
     }
 
     private void DrawSpinner(Rect area, float elapsedSeconds)

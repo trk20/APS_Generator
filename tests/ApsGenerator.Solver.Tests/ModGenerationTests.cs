@@ -375,7 +375,7 @@ public sealed class ModGenerationTests
     {
         var settings = new ApsGenerationSettings();
         Assert.True(settings.IsMaximizingDensity);
-        Assert.Null(settings.CreateRequest().Problem.TargetClusters(settings.CreateRequest().Problem.Template.CreateGrid()));
+        Assert.Null(settings.CreateRequest().Problem.TargetClusters);
         Assert.Equal(ApsSettingsChangeImpact.TetrisSolve, settings.Change(() => settings.SetTargetDensityPercent(72)));
         Assert.Equal(70, settings.TargetDensityPercent);
         settings.SetTargetDensityPercent(1);
@@ -400,13 +400,44 @@ public sealed class ModGenerationTests
         settings.SetTargetDensityPercent(50);
         settings.SetExtraLayers(ExportExtraLayers.TetrisOnly);
         ApsGenerationRequest request = settings.CreateRequest();
-        int target = request.Problem.TargetClusters(request.Problem.Template.CreateGrid())!.Value;
+        int target = request.Problem.TargetClusters!.Value;
 
         ApsSolution solution = new ApsGenerationSolver().Solve(request, CancellationToken.None);
 
         Assert.Equal(target, solution.Result.ClusterCount);
         Assert.Equal(SolverStatus.TargetDensityReached, solution.Result.Status);
-        Assert.True(solution.Untrimmed.ClusterCount >= target);
+    }
+
+    [Fact]
+    [Trait("Category", "Slow")]
+    public void NextAtADensityTargetNeverRepeatsAShownLayout()
+    {
+        // Each untrimmed solve is distinct, but two can trim down to the same layout unless
+        // supersets of every shown layout are excluded.
+        var settings = new ApsGenerationSettings();
+        settings.SetTemplateShape(ApsTemplateShape.Rectangle);
+        settings.SetWidth(9);
+        settings.SetDepth(9);
+        settings.SetSymmetryType(SymmetryType.None);
+        settings.SetTargetDensityPercent(60);
+        settings.SetExtraLayers(ExportExtraLayers.TetrisOnly);
+        ApsGenerationRequest request = settings.CreateRequest();
+        int target = request.Problem.TargetClusters!.Value;
+        var solver = new ApsGenerationSolver();
+
+        ApsSolution current = solver.Solve(request, CancellationToken.None);
+        var seen = new HashSet<string> { Key(current) };
+        for (int step = 0; step < 25; step++)
+        {
+            ApsSolution next = solver.Next(current, request, CancellationToken.None);
+            Assert.Equal(ApsNextLayoutOutcome.None, next.NextLayoutOutcome);
+            Assert.Equal(target, next.Result.ClusterCount);
+            Assert.True(seen.Add(Key(next)), $"Next repeated a shown layout at step {step}.");
+            current = next;
+        }
+
+        static string Key(ApsSolution solution) => string.Join(";", solution.Result.Placements
+            .OrderBy(p => p.Row).ThenBy(p => p.Col).ThenBy(p => p.ShapeIndex));
     }
 
     [Fact]
@@ -519,6 +550,43 @@ public sealed class ModGenerationTests
     }
 
     [Fact]
+    public async Task CancelStopsAPrefetchHandedToNext()
+    {
+        using var worker = new ControlledSolver();
+        using var session = new ApsGenerationSession(worker);
+        ApsGenerationRequest request = Request();
+        worker.NextGate.Reset();
+        worker.Release.Set();
+        session.Generate(request);
+        await Drain(session);
+        await WaitUntil(() => worker.NextCount == 1);
+
+        // The prefetch is still running; cancelling before Next's task even starts must stop it.
+        session.Next(request);
+        session.Cancel();
+
+        lock (worker.NextTokens)
+            Assert.True(worker.NextTokens[0].IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task TimedOutLayoutCannotContinueToANextSolution()
+    {
+        using var worker = new ControlledSolver { SolveStatus = SolverStatus.TimedOut };
+        using var session = new ApsGenerationSession(worker);
+        ApsGenerationRequest request = Request();
+        worker.Release.Set();
+        session.Generate(request);
+        await Drain(session);
+
+        Assert.False(session.CanShowNext);
+        session.Next(request);
+        Assert.False(session.IsBusy);
+        await Task.Delay(50);
+        Assert.Equal(0, worker.NextCount);
+    }
+
+    [Fact]
     public async Task PreviousAndNextReplayTheHistoryWithoutSearching()
     {
         using var worker = new ControlledSolver();
@@ -591,10 +659,11 @@ public sealed class ModGenerationTests
     }
 
     private static ApsGenerationRequest Request() => new ApsGenerationSettings().CreateRequest();
-    private static ApsSolution Solution(ApsGenerationRequest request, CoolerSnakeResult? cooler = null) => new(
+    private static ApsSolution Solution(ApsGenerationRequest request, CoolerSnakeResult? cooler = null,
+        SolverStatus status = SolverStatus.Optimal) => new(
         request, request.Problem.Template.CreateGrid(), new SolverResult
         {
-            Placements = [new(3, 3, 0)], AllSolutions = [], EmptyCells = 0, Status = SolverStatus.Optimal
+            Placements = [new(3, 3, 0)], AllSolutions = [], EmptyCells = 0, Status = status
         }, cooler);
 
     private static async Task<List<ApsGenerationCompletion>> Drain(ApsGenerationSession session)
@@ -614,7 +683,12 @@ public sealed class ModGenerationTests
         internal readonly TaskCompletionSource Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal readonly TaskCompletionSource RefreshStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal readonly WorkerGate Release = new();
+        /// <summary>Extra gate on Next only, open by default; reset it to hold the prefetch.</summary>
+        internal readonly WorkerGate NextGate = new();
+        internal SolverStatus SolveStatus = SolverStatus.Optimal;
         internal int RefreshCount;
+
+        internal ControlledSolver() => NextGate.Set();
         internal int NextCount;
         internal readonly List<CancellationToken> NextTokens = [];
 
@@ -622,7 +696,7 @@ public sealed class ModGenerationTests
         {
             Started.TrySetResult();
             Release.Wait(TimeSpan.FromSeconds(5));
-            return Solution(request);
+            return Solution(request, status: SolveStatus);
         }
 
         public ApsSolution Reconfigure(ApsSolution existing, ApsGenerationRequest request, CancellationToken cancellationToken)
@@ -640,10 +714,15 @@ public sealed class ModGenerationTests
             lock (NextTokens) NextTokens.Add(cancellationToken);
             Started.TrySetResult();
             Release.Wait(TimeSpan.FromSeconds(5));
+            NextGate.Wait(TimeSpan.FromSeconds(5));
             return Solution(request) with { LayoutNumber = existing.LayoutNumber + 1 };
         }
 
-        public void Dispose() => Release.Set();
+        public void Dispose()
+        {
+            Release.Set();
+            NextGate.Set();
+        }
     }
 
     private sealed class WorkerGate

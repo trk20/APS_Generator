@@ -32,5 +32,15 @@ public static class ApsGenerationDefaults
         public const int MaxTimeSeconds = 30;
         public const bool EarlyStopEnabled = true;
         public const SymmetryType DefaultSymmetryType = SymmetryType.None;
+
+        /// <summary>
+        /// Replaces each value that still equals its pre-v2.5 default with the current default.
+        /// Values changed by the user are kept.
+        /// </summary>
+        public static (SymmetryType Symmetry, double Seconds, bool EarlyStop) MigrateSolverDefaults(
+            SymmetryType symmetry, double seconds, bool earlyStop) => (
+            symmetry == DefaultSymmetryType ? ApsGenerationDefaults.DefaultSymmetryType : symmetry,
+            seconds == MaxTimeSeconds ? ApsGenerationDefaults.MaxTimeSeconds : seconds,
+            earlyStop == EarlyStopEnabled ? ApsGenerationDefaults.EarlyStopEnabled : earlyStop);
     }
 }

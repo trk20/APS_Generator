@@ -5,9 +5,9 @@ using ApsGenerator.Solver.Interop;
 namespace ApsGenerator.Solver;
 
 /// <summary>
-/// Finds one more layout, at least as dense as a cluster floor, that differs from every
-/// layout already shown. Each call builds a fresh instance so callers need not keep a
-/// native solver alive between requests.
+/// Finds one more layout at least as dense as a cluster floor that does not contain every
+/// placement of any layout already shown. Excluding supersets (not just exact matches) means a
+/// layout trimmed down to a density target can't reproduce one already shown. Each call builds a fresh instance.
 /// </summary>
 internal static class PackingAlternative
 {
@@ -26,7 +26,7 @@ internal static class PackingAlternative
         for (int index = 0; index < problem.Placements.Count; index++)
             indices[problem.Placements[index]] = index;
         foreach (var layout in excluded)
-            session.Solver.AddClause(BlockingClause(layout, indices, problem.Placements.Count));
+            session.Solver.AddClause(BlockingClause(layout, indices));
 
         var result = session.Solve();
         if (result != CryptoMiniSatNative.Lbool.True)
@@ -35,20 +35,15 @@ internal static class PackingAlternative
         return problem.Decode(session.Solver.GetModel(), SolverStatus.LikelyOptimal);
     }
 
-    private static int[] BlockingClause(IReadOnlyList<Placement> layout, Dictionary<Placement, int> indices, int count)
-    {
-        var selected = new bool[count];
-        foreach (var placement in layout)
-            if (indices.TryGetValue(placement, out int index))
-                selected[index] = true;
-        var clause = new int[count];
-        for (int index = 0; index < count; index++)
-            clause[index] = selected[index] ? -(index + 1) : index + 1;
-        return clause;
-    }
+    /// <summary>At least one placement of <paramref name="layout"/> must be left out.</summary>
+    private static int[] BlockingClause(IReadOnlyList<Placement> layout, Dictionary<Placement, int> indices) =>
+        [.. layout.Select(placement => -(indices[placement] + 1))];
 
     private static SolverResult Empty(PackingProblem problem, SolverStatus status) => new()
     {
-        Placements = [], AllSolutions = [], EmptyCells = problem.AvailableCells, Status = status
+        Placements = [],
+        AllSolutions = [],
+        EmptyCells = problem.AvailableCells,
+        Status = status
     };
 }

@@ -84,6 +84,7 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
     bool IApsGeneratorHudController.IsSolving => generation.IsBusy;
     bool IApsGeneratorHudController.HasCurrentSolution => generation.Solution is not null;
     bool IApsGeneratorHudController.CanShowPrevious => generation.CanShowPrevious;
+    bool IApsGeneratorHudController.CanShowNext => generation.CanShowNext;
     bool IApsGeneratorHudController.HasActivePrefab => IsGeneratedPrefabActive();
     float IApsGeneratorHudController.SolveElapsedSeconds => (float)generation.ElapsedSeconds;
 
@@ -99,7 +100,8 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
     void IApsGeneratorHudController.ResetDefaults() => ChangeSettings(settings.ResetToDefaults);
     void IApsGeneratorHudController.Save() => ShowSaveDialog();
     void IApsGeneratorHudController.Clear() => ClearGeneration();
-    void IApsGeneratorHudController.ChangeSettings(Action change) => ChangeSettings(change);
+    void IApsGeneratorHudController.ChangeSettings(Action change, bool persist) => ChangeSettings(change, persist);
+    void IApsGeneratorHudController.PersistSettings() => SaveSettings();
     void IApsGeneratorHudController.ClaimHudInput() => ClaimBuildInput();
 
     private void Awake() => instance = this;
@@ -141,7 +143,8 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
         try
         {
             Vector2 pointer = new(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
-            worldPreview.Draw(settings, generation.Solution is not null, windowRect.Contains(pointer), ChangeSettings);
+            worldPreview.Draw(settings, generation.Solution is not null, windowRect.Contains(pointer),
+                change => ChangeSettings(change));
         }
         catch (Exception error)
         {
@@ -182,7 +185,7 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
 
     private void StartNextLayout()
     {
-        if (generation.IsBusy || generation.Solution is null) return;
+        if (generation.IsBusy || !generation.CanShowNext) return;
         if (TryDisarmGeneratedPrefab())
             EnterGeneratorPrefabMode();
         generation.Next(settings.CreateRequest());
@@ -248,12 +251,13 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
         }
     }
 
-    private void ChangeSettings(Action change)
+    /// <param name="persist">False while a drag is in progress; the HUD calls <see cref="SaveSettings"/> when it ends.</param>
+    private void ChangeSettings(Action change, bool persist = true)
     {
         ApsSettingsChangeImpact impact = settings.Change(change);
         if (impact == ApsSettingsChangeImpact.None) return;
-        if (settingsLoaded)
-            settingsStore.Save(settings);
+        if (persist)
+            SaveSettings();
         if (impact == ApsSettingsChangeImpact.FutureSolve) return;
         if (impact == ApsSettingsChangeImpact.Prefab)
         {
@@ -413,6 +417,11 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
         hud.Dispose();
         if (launcherIcon is not null)
             UnityEngine.Object.Destroy(launcherIcon);
+        SaveSettings();
+    }
+
+    private void SaveSettings()
+    {
         if (settingsLoaded)
             settingsStore.Save(settings);
     }
