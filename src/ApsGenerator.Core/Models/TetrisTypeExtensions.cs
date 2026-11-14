@@ -15,4 +15,12 @@ public static class TetrisTypeExtensions
 
     public static bool SupportsCoolerSnakes(this TetrisType type) =>
         type is TetrisType.ThreeClip or TetrisType.FourClip or TetrisType.FiveClip;
+
+    /// <summary>Upper bound on clusters for expressing density as a fraction.</summary>
+    public static int TheoreticalMaxClusters(this TetrisType type, int availableCells) => type switch
+    {
+        TetrisType.ThreeClip or TetrisType.FourClip => availableCells / type.EffectiveAutoloadersPerPlacement(),
+        TetrisType.FiveClip => 2 * availableCells / 9,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported tetris type.")
+    };
 }

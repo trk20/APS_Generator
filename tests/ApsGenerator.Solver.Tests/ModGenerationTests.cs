@@ -274,6 +274,322 @@ public sealed class ModGenerationTests
         Assert.Equal(1, settings.HoleSize);
     }
 
+    [Fact]
+    public void VersionOneProfilesMoveUnchangedSolverDefaultsToTheCurrentDefaults()
+    {
+        var settings = new ApsGenerationSettings();
+        settings.Apply(new ApsSettingsData
+        {
+            SchemaVersion = 1, SymmetryType = SymmetryType.None, MaxTimeSeconds = 30,
+            EarlyStopEnabled = true, MaxThreads = 0
+        });
+        Assert.Equal(ApsGenerationDefaults.DefaultSymmetryType, settings.SymmetryType);
+        Assert.Equal(ApsGenerationDefaults.MaxTimeSeconds, settings.MaxTimeSeconds);
+        Assert.Equal(ApsGenerationDefaults.EarlyStopEnabled, settings.EarlyStopEnabled);
+        Assert.Equal(settings.DefaultThreads, settings.MaxThreads);
+        Assert.Equal(ApsSettingsData.CurrentSchemaVersion, settings.Capture().SchemaVersion);
+
+        settings.Apply(new ApsSettingsData
+        {
+            SchemaVersion = 1, SymmetryType = SymmetryType.Rotation180, MaxTimeSeconds = 45,
+            EarlyStopEnabled = false
+        });
+        Assert.Equal(SymmetryType.Rotation180, settings.SymmetryType);
+        Assert.Equal(45, settings.MaxTimeSeconds);
+
+        settings.Apply(new ApsSettingsData { SymmetryType = SymmetryType.None, MaxTimeSeconds = 30 });
+        Assert.Equal(SymmetryType.None, settings.SymmetryType);
+        Assert.Equal(30, settings.MaxTimeSeconds);
+    }
+
+    [Fact]
+    public void ThreadsDefaultToThreeQuartersAndFollowProcessorChanges()
+    {
+        var settings = new ApsGenerationSettings();
+        Assert.Equal(Math.Max(1, (int)(settings.MaximumThreads * 0.75)), settings.MaxThreads);
+        Assert.Equal(0, settings.Capture().MaxThreads);
+        settings.AdjustThreads(-1);
+        if (settings.MaxThreads != settings.DefaultThreads)
+            Assert.Equal(settings.MaxThreads, settings.Capture().MaxThreads);
+        Assert.Equal(2, ApsGenerationDefaults.DefaultThreadCountFor(3));
+        Assert.Equal(1, ApsGenerationDefaults.DefaultThreadCountFor(1));
+        Assert.Equal(11, ApsGenerationDefaults.DefaultThreadCountFor(15));
+    }
+
+    [Fact]
+    public void SizeLimitsDependOnTetrisOptionsAndStopTheWidthStepper()
+    {
+        var settings = new ApsGenerationSettings();
+        settings.SetTetrisType(TetrisType.FiveClip);
+        settings.SetSymmetryType(SymmetryType.None);
+        int maximum = settings.MaximumWidthFor(SymmetryType.None);
+        Assert.True(maximum < ApsGenerationSettings.MaximumDimension);
+        Assert.True(settings.MaximumWidthFor(SymmetryType.BothReflection) > maximum);
+        Assert.True(settings.RecommendedWidthFor(SymmetryType.None) <= maximum);
+
+        settings.SetWidth(maximum);
+        Assert.False(settings.IsTooLarge);
+        Assert.False(settings.CanIncreaseWidth);
+        Assert.Equal(ApsSettingsChangeImpact.None, settings.Change(() => settings.AdjustWidth(1)));
+
+        settings.SetWidth(ApsGenerationSettings.MaximumDimension);
+        Assert.Equal(maximum, settings.Width);
+
+        settings.SetSymmetryType(SymmetryType.BothReflection);
+        Assert.True(settings.CanIncreaseWidth);
+        settings.AdjustWidth(1);
+        settings.SetSymmetryType(SymmetryType.None);
+        Assert.Equal(maximum, settings.Width);
+        Assert.False(settings.IsTooLarge);
+
+        settings.SetTetrisType(TetrisType.ThreeClip);
+        settings.SetWidth(41);
+        settings.SetTetrisType(TetrisType.FiveClip);
+        Assert.Equal(maximum, settings.Width);
+
+        settings.Apply(new ApsSettingsData { TetrisType = TetrisType.FiveClip, SymmetryType = SymmetryType.None, Width = 41 });
+        Assert.Equal(maximum, settings.Width);
+        settings.SetSymmetryType(SymmetryType.BothReflection);
+
+        settings.SetSymmetryType(SymmetryType.BothReflection);
+        settings.SetSymmetryMode(SymmetryMode.Soft);
+        Assert.Equal(maximum, settings.MaximumWidthFor(SymmetryType.BothReflection));
+    }
+
+    [Fact]
+    public void RectangleDepthStepperRespectsTheSameCellBudget()
+    {
+        var settings = new ApsGenerationSettings();
+        settings.SetTemplateShape(ApsTemplateShape.Rectangle);
+        settings.SetTetrisType(TetrisType.FiveClip);
+        settings.SetSymmetryType(SymmetryType.None);
+        settings.SetWidth(settings.MaximumWidthFor(SymmetryType.None));
+        while (settings.CanIncreaseDepth)
+            settings.AdjustDepth(1);
+        Assert.False(settings.IsTooLarge);
+        Assert.True(settings.Depth < ApsGenerationSettings.MaximumDimension);
+    }
+
+    [Fact]
+    public void DensityAndHudScaleSnapToTheirSteps()
+    {
+        var settings = new ApsGenerationSettings();
+        Assert.True(settings.IsMaximizingDensity);
+        Assert.Null(settings.CreateRequest().Problem.TargetClusters(settings.CreateRequest().Problem.Template.CreateGrid()));
+        Assert.Equal(ApsSettingsChangeImpact.TetrisSolve, settings.Change(() => settings.SetTargetDensityPercent(72)));
+        Assert.Equal(70, settings.TargetDensityPercent);
+        settings.SetTargetDensityPercent(1);
+        Assert.Equal(ApsGenerationSettings.MinimumDensityPercent, settings.TargetDensityPercent);
+
+        Assert.Equal(ApsSettingsChangeImpact.FutureSolve, settings.Change(() => settings.AdjustHudScale(1)));
+        Assert.Equal(110, settings.HudScalePercent);
+        settings.ResetToDefaults();
+        Assert.Equal(110, settings.HudScalePercent);
+        Assert.True(settings.IsMaximizingDensity);
+    }
+
+    [Fact]
+    [Trait("Category", "Slow")]
+    public void DensityTargetIsTrimmedToTheExactClusterCount()
+    {
+        var settings = new ApsGenerationSettings();
+        settings.SetTemplateShape(ApsTemplateShape.Rectangle);
+        settings.SetWidth(12);
+        settings.SetDepth(12);
+        settings.SetSymmetryType(SymmetryType.None);
+        settings.SetTargetDensityPercent(50);
+        settings.SetExtraLayers(ExportExtraLayers.TetrisOnly);
+        ApsGenerationRequest request = settings.CreateRequest();
+        int target = request.Problem.TargetClusters(request.Problem.Template.CreateGrid())!.Value;
+
+        ApsSolution solution = new ApsGenerationSolver().Solve(request, CancellationToken.None);
+
+        Assert.Equal(target, solution.Result.ClusterCount);
+        Assert.Equal(SolverStatus.TargetDensityReached, solution.Result.Status);
+        Assert.True(solution.Untrimmed.ClusterCount >= target);
+    }
+
+    [Fact]
+    [Trait("Category", "Slow")]
+    public void NextLayoutFindsDistinctLayoutsUntilExhausted()
+    {
+        var settings = new ApsGenerationSettings();
+        settings.SetTemplateShape(ApsTemplateShape.Rectangle);
+        settings.SetWidth(6);
+        settings.SetDepth(4);
+        settings.SetSymmetryType(SymmetryType.None);
+        settings.SetExtraLayers(ExportExtraLayers.TetrisOnly);
+        ApsGenerationRequest request = settings.CreateRequest();
+        var solver = new ApsGenerationSolver();
+
+        ApsSolution current = solver.Solve(request, CancellationToken.None);
+        int clusters = current.Result.ClusterCount;
+        var seen = new HashSet<string> { Key(current) };
+        for (int step = 0; step < 200 && current.NextLayoutOutcome == ApsNextLayoutOutcome.None; step++)
+        {
+            ApsSolution next = solver.Next(current, request, CancellationToken.None);
+            if (next.NextLayoutOutcome != ApsNextLayoutOutcome.None)
+            {
+                Assert.Equal(ApsNextLayoutOutcome.Exhausted, next.NextLayoutOutcome);
+                Assert.Same(current.Result, next.Result);
+                current = next;
+                break;
+            }
+            Assert.Equal(current.LayoutNumber + 1, next.LayoutNumber);
+            Assert.True(next.Result.ClusterCount >= clusters);
+            Assert.True(seen.Add(Key(next)), "Next repeated a layout.");
+            current = next;
+        }
+        Assert.Equal(ApsNextLayoutOutcome.Exhausted, current.NextLayoutOutcome);
+        Assert.True(seen.Count > 1);
+
+        static string Key(ApsSolution solution) => string.Join(";", solution.Result.Placements
+            .OrderBy(p => p.Row).ThenBy(p => p.Col).ThenBy(p => p.ShapeIndex));
+    }
+
+    [Fact]
+    public async Task NextKeepsTheCurrentLayoutWhileSearching()
+    {
+        using var worker = new ControlledSolver();
+        using var session = new ApsGenerationSession(worker);
+        ApsGenerationRequest request = Request();
+        worker.Release.Set();
+        session.Generate(request);
+        ApsSolution first = Assert.Single(await Drain(session)).Solution!;
+        worker.Release.Reset();
+        session.Next(request);
+        Assert.True(session.IsBusy);
+        Assert.Same(first, session.Solution);
+        worker.Release.Set();
+        Assert.Equal(2, Assert.Single(await Drain(session)).Solution!.LayoutNumber);
+    }
+
+    [Fact]
+    public async Task NextUsesThePrefetchedSolutionWithoutSearchingAgain()
+    {
+        using var worker = new ControlledSolver();
+        using var session = new ApsGenerationSession(worker);
+        ApsGenerationRequest request = Request();
+        worker.Release.Set();
+        session.Generate(request);
+        await Drain(session);
+        await WaitUntil(() => worker.NextCount == 1);
+
+        session.Next(request);
+        ApsSolution second = Assert.Single(await Drain(session)).Solution!;
+
+        Assert.Equal(2, second.LayoutNumber);
+        // The only other search is the prefetch for the third solution.
+        await WaitUntil(() => worker.NextCount == 2);
+    }
+
+    [Fact]
+    public async Task PrefabRefreshKeepsThePrefetchAndAdaptsItsOutput()
+    {
+        using var worker = new ControlledSolver();
+        using var session = new ApsGenerationSession(worker);
+        ApsGenerationRequest request = Request();
+        worker.Release.Set();
+        session.Generate(request);
+        await Drain(session);
+        var taller = request with { Output = request.Output with { ComponentHeight = 5 } };
+        session.Refresh(taller);
+        await Drain(session);
+
+        session.Next(taller);
+        ApsSolution next = Assert.Single(await Drain(session)).Solution!;
+
+        Assert.Equal(taller, next.Request);
+        Assert.Equal(2, next.LayoutNumber);
+        await WaitUntil(() => worker.NextCount == 2);
+    }
+
+    [Fact]
+    public async Task ClearCancelsThePrefetch()
+    {
+        using var worker = new ControlledSolver();
+        using var session = new ApsGenerationSession(worker);
+        worker.Release.Set();
+        session.Generate(Request());
+        await Drain(session);
+        await WaitUntil(() => worker.NextCount == 1);
+        session.Clear();
+        lock (worker.NextTokens)
+            Assert.True(worker.NextTokens[0].IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task PreviousAndNextReplayTheHistoryWithoutSearching()
+    {
+        using var worker = new ControlledSolver();
+        using var session = new ApsGenerationSession(worker);
+        ApsGenerationRequest request = Request();
+        worker.Release.Set();
+        session.Generate(request);
+        await Drain(session);
+        Assert.False(session.CanShowPrevious);
+        session.Next(request);
+        ApsSolution second = Assert.Single(await Drain(session)).Solution!;
+        await WaitUntil(() => worker.NextCount == 2);
+
+        session.Previous(request);
+        Assert.Equal(1, Assert.Single(await Drain(session)).Solution!.LayoutNumber);
+        Assert.False(session.CanShowPrevious);
+        session.Next(request);
+        Assert.Same(second, Assert.Single(await Drain(session)).Solution);
+        Assert.Equal(2, worker.NextCount);
+
+        session.Next(request);
+        Assert.Equal(3, Assert.Single(await Drain(session)).Solution!.LayoutNumber);
+        Assert.True(session.CanShowPrevious);
+    }
+
+    [Fact]
+    public async Task PreviousAdaptsAnOlderSolutionToNewPrefabOptions()
+    {
+        using var worker = new ControlledSolver();
+        using var session = new ApsGenerationSession(worker);
+        ApsGenerationRequest request = Request();
+        worker.Release.Set();
+        session.Generate(request);
+        await Drain(session);
+        session.Next(request);
+        await Drain(session);
+        var taller = request with { Output = request.Output with { ComponentHeight = 5 } };
+        session.Refresh(taller);
+        await Drain(session);
+
+        session.Previous(taller);
+        ApsSolution first = Assert.Single(await Drain(session)).Solution!;
+
+        Assert.Equal(1, first.LayoutNumber);
+        Assert.Equal(taller, first.Request);
+        Assert.Equal(2, worker.RefreshCount);
+    }
+
+    [Fact]
+    public async Task ClearForgetsTheHistory()
+    {
+        using var worker = new ControlledSolver();
+        using var session = new ApsGenerationSession(worker);
+        ApsGenerationRequest request = Request();
+        worker.Release.Set();
+        session.Generate(request);
+        await Drain(session);
+        session.Next(request);
+        await Drain(session);
+        session.Clear();
+        Assert.False(session.CanShowPrevious);
+        Assert.Null(session.Solution);
+    }
+
+    private static async Task WaitUntil(Func<bool> condition)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (!condition())
+            await Task.Delay(1, timeout.Token);
+    }
+
     private static ApsGenerationRequest Request() => new ApsGenerationSettings().CreateRequest();
     private static ApsSolution Solution(ApsGenerationRequest request, CoolerSnakeResult? cooler = null) => new(
         request, request.Problem.Template.CreateGrid(), new SolverResult
@@ -299,6 +615,8 @@ public sealed class ModGenerationTests
         internal readonly TaskCompletionSource RefreshStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal readonly WorkerGate Release = new();
         internal int RefreshCount;
+        internal int NextCount;
+        internal readonly List<CancellationToken> NextTokens = [];
 
         public ApsSolution Solve(ApsGenerationRequest request, CancellationToken cancellationToken)
         {
@@ -312,7 +630,17 @@ public sealed class ModGenerationTests
             Interlocked.Increment(ref RefreshCount);
             RefreshStarted.TrySetResult();
             Release.Wait(TimeSpan.FromSeconds(5));
-            return Solution(request);
+            // Like the real solver, a refresh keeps the solution history.
+            return existing with { Request = request };
+        }
+
+        public ApsSolution Next(ApsSolution existing, ApsGenerationRequest request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref NextCount);
+            lock (NextTokens) NextTokens.Add(cancellationToken);
+            Started.TrySetResult();
+            Release.Wait(TimeSpan.FromSeconds(5));
+            return Solution(request) with { LayoutNumber = existing.LayoutNumber + 1 };
         }
 
         public void Dispose() => Release.Set();

@@ -33,7 +33,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private EnumDisplayItem<TetrisType> selectedTetrisType = EnumValues.TetrisTypes[0];
     [ObservableProperty]
-    private EnumDisplayItem<SymmetryType> selectedSymmetryType = EnumValues.SymmetryTypes[0];
+    private EnumDisplayItem<SymmetryType> selectedSymmetryType = EnumValues.Default(EnumValues.SymmetryTypes, ApsGenerationDefaults.DefaultSymmetryType);
     [ObservableProperty]
     private bool isHardSymmetry = ApsGenerationDefaults.DefaultSymmetryMode == SymmetryMode.Hard;
     [ObservableProperty]
@@ -173,7 +173,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    private int threadCount = Math.Max(1, Environment.ProcessorCount - 1);
+    private int threadCount = ApsGenerationDefaults.DefaultThreadCount;
     [ObservableProperty]
     private int defaultExportHeightBasic = ApsGenerationDefaults.BasicComponentHeight;
     [ObservableProperty]
@@ -185,7 +185,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string exportNameTemplate = UserSettings.DefaultExportNameTemplate;
 
-    public int MaxThreadCount => Math.Max(1, Environment.ProcessorCount - 1);
+    public int MaxThreadCount => ApsGenerationDefaults.MaximumThreadCount;
 
     public Func<string, Task<bool>>? ConfirmAsync { get; set; }
     public Func<Task>? ShowExportDialogAsync { get; set; }

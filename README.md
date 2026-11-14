@@ -207,5 +207,4 @@ See [mod development](mod-development.md), and [solver benchmarks](benchmarks/RE
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE.md). Bundled dependencies
-are documented in [Third-party notices](THIRD-PARTY-NOTICES.md).
+This project is licensed under the [MIT License](LICENSE.md). Bundled dependencies are documented in [Third-party notices](THIRD-PARTY-NOTICES.md).

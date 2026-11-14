@@ -1,8 +1,10 @@
 # Recent Changes
 
-- Faster solving through incremental optimization, smaller symmetry-aware coverage constraints, and improved placement conflict encoding - faster across tested scenarios by ~90%, about 10x faster overall.
-- Updated bundled CryptoMiniSat to 5.16.0
-- Increased the template size limit to 60 to account for 4-way symmetry 3-clip now being feasible above 50.
+- New defaults for better default experience: Mirror symmetry, 15 s time limit, early stop off, 75% of available threads.
+- Mod: macOS support (Apple silicon and Intel).
+- Mod: HUD that scales with screen resolution, adjustable.
+- Mod: size limits for each Tetris type and symmetry, clear warning for large solves, and hints for max size of symmetric layouts.
+- Mod: target density slider, and **Next solution** (replacing Regenerate) and **Previous** to step through different solutions at the same density.
 
 <!-- install-start -->
 

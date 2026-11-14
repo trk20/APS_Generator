@@ -26,6 +26,7 @@ internal static class UserSettingsResolution
 
         return new UserSettings
         {
+            SettingsVersion = UserSettings.CurrentSettingsVersion,
             TemplateShape = DefinedOr(settings.TemplateShape, defaults.TemplateShape),
             TemplateWidth = width,
             TemplateHeight = height,
@@ -78,7 +79,8 @@ internal static class UserSettingsResolution
         vm.SelectedTetrisType = FindDisplayItem(
             EnumValues.TetrisTypes, validated.SelectedTetrisType, EnumValues.TetrisTypes[0]);
         vm.SelectedSymmetryType = FindDisplayItem(
-            EnumValues.SymmetryTypes, validated.SelectedSymmetryType, EnumValues.SymmetryTypes[0]);
+            EnumValues.SymmetryTypes, validated.SelectedSymmetryType,
+            EnumValues.Default(EnumValues.SymmetryTypes, ApsGenerationDefaults.DefaultSymmetryType));
         vm.IsHardSymmetry = validated.IsHardSymmetry;
         vm.EarlyStopEnabled = validated.EarlyStopEnabled;
         vm.GenerateCoolerSnake = validated.GenerateCoolerSnake;

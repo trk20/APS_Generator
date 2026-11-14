@@ -18,8 +18,17 @@ internal static class ApsGenerationStatus
         {
             SolverStatus.TimedOut => "Timed out, best layout found applied",
             SolverStatus.LikelyOptimal => "Likely optimal",
+            SolverStatus.TargetDensityReached => "Target density",
             SolverStatus.Optimal => "Optimal",
             _ => solution.Result.Status.ToString()
         };
     }
+
+    /// <summary>Explains why Next kept the current layout, or null when it found a new one.</summary>
+    internal static string? DescribeNextLayoutOutcome(ApsSolution solution) => solution.NextLayoutOutcome switch
+    {
+        ApsNextLayoutOutcome.Exhausted => "No other solution at this density",
+        ApsNextLayoutOutcome.TimedOut => "No other solution found in time",
+        _ => null
+    };
 }
