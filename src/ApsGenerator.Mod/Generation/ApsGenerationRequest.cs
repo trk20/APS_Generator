@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using ApsGenerator.Core;
 using ApsGenerator.Core.Export;
 using ApsGenerator.Core.Models;
@@ -14,15 +15,31 @@ internal sealed record ApsTemplate(
     CenterHoleShape HoleShape,
     int HoleSize)
 {
+    private static readonly ConcurrentDictionary<ApsTemplate, int> CellCounts = new();
+
     internal Grid CreateGrid() => Shape switch
     {
         ApsTemplateShape.CircleCenterHole => TemplateGenerator.Circle(Width, HoleShape, HoleSize),
         ApsTemplateShape.Circle => TemplateGenerator.Circle(Width, blockCenter: false),
         _ => TemplateGenerator.Rectangle(Width, Depth)
     };
+
+    /// <summary>Cache for available cells</summary>
+    internal int AvailableCells => CellCounts.GetOrAdd(this, template => template.CreateGrid().AvailableCellCount);
 }
 
-internal sealed record TetrisProblem(ApsTemplate Template, TetrisType Type, SymmetryType Symmetry, SymmetryMode SymmetryMode);
+internal sealed record TetrisProblem(
+    ApsTemplate Template,
+    TetrisType Type,
+    SymmetryType Symmetry,
+    SymmetryMode SymmetryMode,
+    int TargetDensityPercent = 100)
+{
+    /// <summary>Cluster target for the solver (null to maximize).</summary>
+    internal int? TargetClusters => TargetDensityPercent >= 100
+        ? null
+        : Math.Max(1, (int)Math.Round(Type.TheoreticalMaxClusters(Template.AvailableCells) * TargetDensityPercent / 100.0));
+}
 internal sealed record ApsOutputOptions(int ComponentHeight, ExportExtraLayers Layers);
 internal sealed record ApsSolveLimits(int Seconds, int Threads, bool EarlyStop);
 
@@ -38,6 +55,7 @@ internal sealed record ApsGenerationRequest(TetrisProblem Problem, ApsOutputOpti
         SymmetryType = Problem.Symmetry,
         SymmetryMode = Problem.SymmetryMode,
         EarlyStopEnabled = Limits.EarlyStop,
+        TargetClusterCount = Problem.TargetClusters,
         NumSolutions = 1
     };
 }

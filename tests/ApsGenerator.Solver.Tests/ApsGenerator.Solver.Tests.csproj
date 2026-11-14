@@ -30,5 +30,6 @@
     <Compile Include="../../src/ApsGenerator.Mod/Generation/ApsGenerationSession.cs" Link="Mod/Generation/ApsGenerationSession.cs" />
     <Compile Include="../../src/ApsGenerator.Mod/Generation/ApsGenerationSolver.cs" Link="Mod/Generation/ApsGenerationSolver.cs" />
     <Compile Include="../../src/ApsGenerator.Mod/Generation/ApsGenerationStatus.cs" Link="Mod/Generation/ApsGenerationStatus.cs" />
+    <Compile Include="../../src/ApsGenerator.Mod/Generation/ApsSolveSizeLimits.cs" Link="Mod/Generation/ApsSolveSizeLimits.cs" />
   </ItemGroup>
 </Project>

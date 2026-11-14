@@ -6,7 +6,7 @@ This tool provides a simple, user-friendly method to easily generate density-opt
 
 ![showcase image](readme-images/showcase.png)
 
-> NEW! In-game mod version available - check out the steam workshop page: [APS Generator Mod](https://steamcommunity.com/sharedfiles/filedetails/?id=3808824333)![mod preview](readme-images/mod-preview.png)
+> NEW! In-game mod version available - check out the steam workshop page: [APS Generator Mod](https://steamcommunity.com/sharedfiles/filedetails/?id=3808824333)![mod preview](readme-images/mod-preview.jpg)
 
 ---
 
@@ -207,5 +207,4 @@ See [mod development](mod-development.md), and [solver benchmarks](benchmarks/RE
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE.md). Bundled dependencies
-are documented in [Third-party notices](THIRD-PARTY-NOTICES.md).
+This project is licensed under the [MIT License](LICENSE.md). Bundled dependencies are documented in [Third-party notices](THIRD-PARTY-NOTICES.md).

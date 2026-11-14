@@ -1,3 +1,4 @@
+using ApsGenerator.Core;
 using ApsGenerator.Core.Models;
 using ApsGenerator.Solver;
 using ApsGenerator.Solver.Cooler;
@@ -14,15 +15,45 @@ internal sealed class ApsGenerationSolver : IApsGenerationSolver
             throw new ArgumentNullException(nameof(request));
 
         Grid grid = request.Problem.Template.CreateGrid();
-        SolverOptions options = request.CreateSolverOptions();
-
         SolverResult result = new TetrisSolver().Solve(
             grid,
             request.Problem.Type,
-            options,
+            request.CreateSolverOptions(),
             cancellationToken);
-        CoolerSnakeResult? cooler = SolveCooler(request, grid, result, cancellationToken);
-        return new ApsSolution(request, grid, result, cooler);
+        return Complete(request, grid, result, [], 1, cancellationToken);
+    }
+
+    public ApsSolution Next(
+        ApsSolution existing,
+        ApsGenerationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (existing.Request.Problem != request.Problem)
+            throw new InvalidOperationException("Cannot continue a layout sequence for a different Tetris problem.");
+        if (!existing.CanFindNext)
+            throw new InvalidOperationException("Cannot continue from a layout that did not finish solving.");
+
+        Grid grid = existing.Grid;
+        SolverOptions options = request.CreateSolverOptions();
+        // A density target only needs another layout that reaches the target; maximizing
+        // needs one at least as dense as the layout already shown.
+        int minimumClusters = options.TargetClusterCount ?? existing.Result.ClusterCount;
+        SolverResult alternative = new TetrisSolver().SolveAlternative(
+            grid, request.Problem.Type, options, existing.Layouts, minimumClusters, cancellationToken);
+        if (alternative.Placements.Count == 0)
+        {
+            return existing with
+            {
+                Request = request,
+                NextLayoutOutcome = alternative.Status == SolverStatus.TimedOut
+                    ? ApsNextLayoutOutcome.TimedOut
+                    : ApsNextLayoutOutcome.Exhausted
+            };
+        }
+
+        // Report the original optimality: the alternative matches that density.
+        alternative = alternative with { Status = existing.Result.Status };
+        return Complete(request, grid, alternative, existing.Layouts, existing.LayoutNumber + 1, cancellationToken);
     }
 
     public ApsSolution Reconfigure(
@@ -37,7 +68,41 @@ internal sealed class ApsGenerationSolver : IApsGenerationSolver
         CoolerSnakeResult? cooler = CanReuseCooler(existing, request)
             ? existing.Cooler
             : SolveCooler(request, existing.Grid, existing.Result, cancellationToken);
-        return new ApsSolution(request, existing.Grid, existing.Result, cooler);
+        return existing with { Request = request, Cooler = cooler, NextLayoutOutcome = ApsNextLayoutOutcome.None };
+    }
+
+    private static ApsSolution Complete(
+        ApsGenerationRequest request,
+        Grid grid,
+        SolverResult solved,
+        IReadOnlyList<IReadOnlyList<Placement>> previousLayouts,
+        int layoutNumber,
+        CancellationToken cancellationToken)
+    {
+        SolverResult result = Trim(request, grid, solved);
+        CoolerSnakeResult? cooler = SolveCooler(request, grid, result, cancellationToken);
+        return new ApsSolution(request, grid, result, cooler)
+        {
+            Layouts = [.. previousLayouts, result.Placements],
+            LayoutNumber = layoutNumber
+        };
+    }
+
+    /// <summary>The solver stops once it reaches a density target, possibly above it; trim to the exact target.</summary>
+    private static SolverResult Trim(ApsGenerationRequest request, Grid grid, SolverResult result)
+    {
+        if (request.Problem.TargetClusters is not int target || result.Placements.Count <= target)
+            return result;
+        IReadOnlyList<Placement> trimmed = PlacementTrimmer.Trim(
+            result.Placements, grid, request.Problem.Type, request.Problem.Symmetry, target);
+        return result with
+        {
+            Placements = trimmed,
+            AllSolutions = [trimmed],
+            EmptyCells = PlacementCoverage.EmptyExclusiveCellCount(
+                trimmed, ClusterShape.GetShapes(request.Problem.Type), grid.AvailableCellCount),
+            Status = SolverStatus.TargetDensityReached
+        };
     }
 
     private static bool CanReuseCooler(ApsSolution existing, ApsGenerationRequest request)
@@ -78,7 +143,31 @@ internal sealed class ApsGenerationSolver : IApsGenerationSolver
     }
 }
 
+internal enum ApsNextLayoutOutcome
+{
+    /// <summary>The solution came from Generate, a refresh, or a successful Next.</summary>
+    None,
+    /// <summary>Next got UNSAT at this density.</summary>
+    Exhausted,
+    /// <summary>Next ran out of time without finding another layout.</summary>
+    TimedOut
+}
+
 internal sealed record ApsSolution(ApsGenerationRequest Request, Grid Grid, SolverResult Result, CoolerSnakeResult? Cooler)
 {
     internal TetrisType Type => Request.Problem.Type;
+
+    /// <summary>Every layout shown so far for this problem, as shown (after trimming).</summary>
+    internal IReadOnlyList<IReadOnlyList<Placement>> Layouts { get; init; } = [Result.Placements];
+
+    /// <summary>1-based position of this layout in the sequence.</summary>
+    internal int LayoutNumber { get; init; } = 1;
+
+    internal ApsNextLayoutOutcome NextLayoutOutcome { get; init; }
+
+    // Don't find the next layout if the solve timed out
+    internal bool CanFindNext => Result.Status != SolverStatus.TimedOut && Result.Placements.Count > 0;
+
+    /// <summary>How long this solution took to solve.</summary>
+    internal double SolveSeconds { get; init; }
 }

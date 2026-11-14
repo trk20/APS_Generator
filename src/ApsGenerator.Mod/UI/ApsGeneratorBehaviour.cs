@@ -27,7 +27,8 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
     private bool windowVisible;
     private bool worldPreviewEnabled = true;
     private bool launcherIconLoadAttempted;
-    private ApsSettingsStore? settingsStore;
+    private readonly ApsSettingsStore settingsStore = new();
+    private bool settingsLoaded;
     private SavedSubObject? ownedPrefab;
     private Texture2D? launcherIcon;
 
@@ -42,7 +43,7 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
                 return false;
 
             Vector2 pointer = new(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
-            return behaviour.windowRect.Contains(pointer) ||
+            return behaviour.windowRect.Contains(pointer) || behaviour.hud.IsCapturingPointer ||
                    (behaviour.worldPreviewEnabled && behaviour.worldPreview.IsPointerCaptured(
                        behaviour.settings,
                        behaviour.generation.Solution is not null));
@@ -59,11 +60,12 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
         if (instance is not { windowVisible: false } behaviour || !IsPrefabModeActive())
             return;
 
+        float size = LauncherButtonSize * ApsGeneratorHud.ResolutionScale;
         var area = new Rect(
             Screen.width * PrefabControlsRight + LauncherButtonGap,
             Screen.height * PrefabControlsTop,
-            LauncherButtonSize,
-            LauncherButtonSize);
+            size,
+            size);
         behaviour.EnsureLauncherIconLoaded();
         var content = behaviour.launcherIcon is null
             ? new GUIContent("APS", "Open APS Generator")
@@ -81,10 +83,14 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
         : status;
     bool IApsGeneratorHudController.IsSolving => generation.IsBusy;
     bool IApsGeneratorHudController.HasCurrentSolution => generation.Solution is not null;
+    bool IApsGeneratorHudController.CanShowPrevious => generation.CanShowPrevious;
+    bool IApsGeneratorHudController.CanShowNext => generation.CanShowNext;
     bool IApsGeneratorHudController.HasActivePrefab => IsGeneratedPrefabActive();
     float IApsGeneratorHudController.SolveElapsedSeconds => (float)generation.ElapsedSeconds;
 
     void IApsGeneratorHudController.Generate() => StartSolve();
+    void IApsGeneratorHudController.NextLayout() => StartNextLayout();
+    void IApsGeneratorHudController.PreviousSolution() => StartPreviousSolution();
     void IApsGeneratorHudController.Cancel()
     {
         generation.Cancel();
@@ -94,13 +100,20 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
     void IApsGeneratorHudController.ResetDefaults() => ChangeSettings(settings.ResetToDefaults);
     void IApsGeneratorHudController.Save() => ShowSaveDialog();
     void IApsGeneratorHudController.Clear() => ClearGeneration();
-    void IApsGeneratorHudController.ChangeSettings(Action change) => ChangeSettings(change);
+    void IApsGeneratorHudController.ChangeSettings(Action change, bool persist) => ChangeSettings(change, persist);
+    void IApsGeneratorHudController.PersistSettings() => SaveSettings();
     void IApsGeneratorHudController.ClaimHudInput() => ClaimBuildInput();
 
-    private void Awake()
+    private void Awake() => instance = this;
+
+    /// <summary>
+    /// Loads saved settings on first use (plugins load before FtD loads the player profile).
+    /// </summary>
+    private void EnsureSettingsLoaded()
     {
-        instance = this;
-        settingsStore = new ApsSettingsStore();
+        if (settingsLoaded)
+            return;
+        settingsLoaded = true;
         settingsStore.LoadInto(settings);
     }
 
@@ -129,7 +142,9 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
 
         try
         {
-            worldPreview.Draw(settings, generation.Solution is not null, ChangeSettings);
+            Vector2 pointer = new(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
+            worldPreview.Draw(settings, generation.Solution is not null, windowRect.Contains(pointer),
+                change => ChangeSettings(change));
         }
         catch (Exception error)
         {
@@ -158,9 +173,30 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
     private void StartSolve()
     {
         if (generation.IsBusy) return;
+        if (settings.IsTooLarge)
+        {
+            status = "Too large: reduce the size or add symmetry";
+            return;
+        }
         if (TryDisarmGeneratedPrefab())
             EnterGeneratorPrefabMode();
         generation.Generate(settings.CreateRequest());
+    }
+
+    private void StartNextLayout()
+    {
+        if (generation.IsBusy || !generation.CanShowNext) return;
+        if (TryDisarmGeneratedPrefab())
+            EnterGeneratorPrefabMode();
+        generation.Next(settings.CreateRequest());
+    }
+
+    private void StartPreviousSolution()
+    {
+        if (generation.IsBusy || !generation.CanShowPrevious) return;
+        if (TryDisarmGeneratedPrefab())
+            EnterGeneratorPrefabMode();
+        generation.Previous(settings.CreateRequest());
     }
 
     private void ObserveCompletedSolve()
@@ -176,7 +212,9 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
         if (completion.Solution is ApsSolution solution)
         {
             status = ApsGenerationStatus.Describe(solution);
-            if (solution.Result.Placements.Count > 0) TryStartNativePlacement();
+            bool placed = solution.Result.Placements.Count > 0 && TryStartNativePlacement();
+            if (placed && ApsGenerationStatus.DescribeNextLayoutOutcome(solution) is string outcome)
+                status = $"{outcome} · {status}";
         }
     }
 
@@ -199,7 +237,8 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
             ApsGeneratedPrefab generated = ApsPrefabFactory.Create(construct, solution);
             build.SetLoadPrefab(generated.Prefab);
             ownedPrefab = generated.Prefab;
-            status = $"{ApsGenerationStatus.Describe(solution)} · {generation.LastSolveSeconds:0.0}s · " +
+            string layout = solution.LayoutNumber > 1 ? $"Solution {solution.LayoutNumber} · " : "";
+            status = $"{layout}{ApsGenerationStatus.Describe(solution)} · {generation.LastSolveSeconds:0.0}s · " +
                      $"{solution.Result.ClusterCount} clusters · " +
                      $"{generated.MaterialCost:N0} mats";
             return true;
@@ -212,11 +251,13 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
         }
     }
 
-    private void ChangeSettings(Action change)
+    /// <param name="persist">False while a drag is in progress; the HUD calls <see cref="SaveSettings"/> when it ends.</param>
+    private void ChangeSettings(Action change, bool persist = true)
     {
         ApsSettingsChangeImpact impact = settings.Change(change);
         if (impact == ApsSettingsChangeImpact.None) return;
-        settingsStore?.Save(settings);
+        if (persist)
+            SaveSettings();
         if (impact == ApsSettingsChangeImpact.FutureSolve) return;
         if (impact == ApsSettingsChangeImpact.Prefab)
         {
@@ -308,6 +349,7 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
 
     private void OpenHud()
     {
+        EnsureSettingsLoaded();
         windowVisible = true;
         if (!IsGeneratedPrefabActive())
         {
@@ -375,6 +417,12 @@ internal sealed class ApsGeneratorBehaviour : MonoBehaviour, IApsGeneratorHudCon
         hud.Dispose();
         if (launcherIcon is not null)
             UnityEngine.Object.Destroy(launcherIcon);
-        settingsStore?.Save(settings);
+        SaveSettings();
+    }
+
+    private void SaveSettings()
+    {
+        if (settingsLoaded)
+            settingsStore.Save(settings);
     }
 }

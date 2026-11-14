@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using ApsGenerator.Core.Models;
 
 namespace ApsGenerator.UI.Services;
 
@@ -25,7 +26,7 @@ public static class UserSettingsStore
         {
             using var stream = File.OpenRead(settingsPath);
             using var document = JsonDocument.Parse(stream);
-            return ParseSettings(document.RootElement, defaults);
+            return MigrateLegacyDefaults(ParseSettings(document.RootElement, defaults));
         }
         catch (Exception ex)
         {
@@ -62,6 +63,8 @@ public static class UserSettingsStore
 
         return new UserSettings
         {
+            // Files written before versioning have no key and predate the version 2 defaults.
+            SettingsVersion = ReadInt(root, nameof(UserSettings.SettingsVersion), 1),
             TemplateShape = ReadEnum(root, nameof(UserSettings.TemplateShape), defaults.TemplateShape),
             TemplateWidth = ReadInt(root, nameof(UserSettings.TemplateWidth), defaults.TemplateWidth),
             TemplateHeight = ReadInt(root, nameof(UserSettings.TemplateHeight), defaults.TemplateHeight),
@@ -92,6 +95,25 @@ public static class UserSettingsStore
             PendingReleaseNotesContent = ReadString(root, nameof(UserSettings.PendingReleaseNotesContent)),
             LastSeenUpdateVersion = ReadString(root, nameof(UserSettings.LastSeenUpdateVersion))
         };
+    }
+
+    /// <summary>
+    /// Replaces values that still equal the pre-version-2 defaults, so users who never changed
+    /// them pick up the new defaults. Values the user changed are kept.
+    /// </summary>
+    internal static UserSettings MigrateLegacyDefaults(UserSettings settings)
+    {
+        if (settings.SettingsVersion >= UserSettings.CurrentSettingsVersion)
+            return settings;
+
+        (settings.SelectedSymmetryType, settings.MaxTimeSeconds, settings.EarlyStopEnabled) =
+            ApsGenerationDefaults.Legacy.MigrateSolverDefaults(
+                settings.SelectedSymmetryType, settings.MaxTimeSeconds, settings.EarlyStopEnabled);
+        // The old thread default was every processor but one.
+        if (settings.ThreadCount == ApsGenerationDefaults.MaximumThreadCount)
+            settings.ThreadCount = ApsGenerationDefaults.DefaultThreadCount;
+        settings.SettingsVersion = UserSettings.CurrentSettingsVersion;
+        return settings;
     }
 
     private static string GetSettingsPath()

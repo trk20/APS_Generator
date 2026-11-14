@@ -28,6 +28,7 @@ internal sealed class ApsPreviewHandles : IDisposable
         ApsGenerationSettings settings,
         Matrix4x4 placementMatrix,
         bool heightOnly,
+        bool pointerOverHud,
         Action<Action> changeSettings)
     {
         Camera? camera = Camera.main;
@@ -36,7 +37,11 @@ internal sealed class ApsPreviewHandles : IDisposable
 
         RestrictInteraction(heightOnly);
         PreviewHandle[] handles = CreateHandles(settings, heightOnly);
-        UpdateInteraction(camera, placementMatrix, handles, settings, changeSettings);
+        // Avoid interacting with handles behind the HUD.
+        if (pointerOverHud && drag is null)
+            hovered = null;
+        else
+            UpdateInteraction(camera, placementMatrix, handles, settings, changeSettings);
         DrawHandles(camera, placementMatrix, handles);
     }
 

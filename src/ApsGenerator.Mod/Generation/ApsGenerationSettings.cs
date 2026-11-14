@@ -23,6 +23,12 @@ internal sealed class ApsGenerationSettings
     internal const int FiveClipSectionHeight = ApsGenerator.Core.Export.ApsLayoutGeometry.FiveClipSectionHeight;
     internal const int MinimumSeconds = 1;
     internal const int MaximumSeconds = 120;
+    internal const int MinimumDensityPercent = 35;
+    internal const int MaximumDensityPercent = 100;
+    internal const int DensityPercentStep = 5;
+    internal const int MinimumHudScalePercent = 50;
+    internal const int MaximumHudScalePercent = 160;
+    internal const int HudScalePercentStep = 10;
 
     internal ApsGenerationSettings() => ResetToDefaults();
 
@@ -41,28 +47,73 @@ internal sealed class ApsGenerationSettings
     internal int MaxThreads { get; private set; }
     internal bool EarlyStopEnabled { get; private set; }
     internal ExportExtraLayers ExtraLayers { get; private set; }
+    /// <summary>Target cluster count as a percentage of the theoretical maximum; 100 maximizes.</summary>
+    internal int TargetDensityPercent { get; private set; }
+    /// <summary>User multiplier on the resolution-based HUD scale.</summary>
+    internal int HudScalePercent { get; private set; } = 100;
 
     internal bool IsDepthLocked => TemplateShape != ApsTemplateShape.Rectangle;
-    internal int MaximumThreads => Math.Max(1, Environment.ProcessorCount - 1);
-    internal int RecommendedMaximumDimension => TetrisType switch
-    {
-        TetrisType.FiveClip => 15,
-        TetrisType.FourClip => 19,
-        _ => 23
-    };
-    internal bool IsUnusuallyLarge =>
-        Width > RecommendedMaximumDimension || Depth > RecommendedMaximumDimension;
+    internal int MaximumThreads => ApsGenerationDefaults.MaximumThreadCount;
+    internal int DefaultThreads => ApsGenerationDefaults.DefaultThreadCountFor(MaximumThreads);
+    internal bool IsMaximizingDensity => TargetDensityPercent >= MaximumDensityPercent;
 
-    internal void ResetToDefaults() => Apply(new ApsSettingsData());
+    /// <summary>How the current template compares with the size limits for the current Tetris options.</summary>
+    internal ApsSolveSize SolveSize => ApsSolveSizeLimits.Classify(
+        CreateRequest().Problem.Template.AvailableCells, TetrisType, SymmetryType, SymmetryMode);
+    internal bool IsUnusuallyLarge => SolveSize != ApsSolveSize.Normal;
+    internal bool IsTooLarge => SolveSize == ApsSolveSize.TooLarge;
+
+    /// <summary>Largest width the current shape allows with <paramref name="symmetry"/> (and the current mode).</summary>
+    internal int MaximumWidthFor(SymmetryType symmetry) =>
+        WidthLimitFor(symmetry, ApsSolveSizeLimits.Limit.Maximum);
+
+    /// <summary>Largest width before the large-solve warning with <paramref name="symmetry"/>.</summary>
+    internal int RecommendedWidthFor(SymmetryType symmetry) =>
+        WidthLimitFor(symmetry, ApsSolveSizeLimits.Limit.Recommended);
+
+    /// <summary>
+    /// Largest width the width stepper can reach (respecting odd-size snapping) with the current
+    /// shape and depth that stays within <paramref name="limit"/>.
+    /// </summary>
+    private int WidthLimitFor(SymmetryType symmetry, ApsSolveSizeLimits.Limit limit)
+    {
+        int largest = NormalizeHorizontalDimension(MinimumTemplateDimension, MinimumTemplateDimension);
+        for (int width = largest; width <= MaximumDimension; width++)
+        {
+            int reachable = NormalizeHorizontalDimension(width, MinimumTemplateDimension);
+            if (!Fits(reachable, IsDepthLocked ? reachable : Depth, symmetry, limit))
+                break;
+            largest = reachable;
+        }
+        return largest;
+    }
+
+    /// <summary>
+    /// Whether a template of this size, with the hole size <see cref="SetWidth"/> would pick for
+    /// <paramref name="width"/>, stays within <paramref name="limit"/>. 
+    /// </summary>
+    private bool Fits(int width, int depth, SymmetryType symmetry, ApsSolveSizeLimits.Limit limit)
+    {
+        var template = new ApsTemplate(TemplateShape, width, depth, HoleShape,
+            NormalizeHoleSizeFor(width, requestedHoleSize));
+        return template.AvailableCells <= ApsSolveSizeLimits.CellBudget(TetrisType, symmetry, SymmetryMode, limit);
+    }
+
+    internal void ResetToDefaults()
+    {
+        int hudScale = HudScalePercent;
+        Apply(new ApsSettingsData());
+        HudScalePercent = hudScale;
+    }
 
     internal ApsSettingsChangeImpact Change(Action change)
     {
         ApsGenerationRequest previous = CreateRequest();
-        bool previousOddSnapping = SnapToOddDimensions;
+        (bool, int) previousPreferences = (SnapToOddDimensions, HudScalePercent);
         change();
         ApsGenerationRequest current = CreateRequest();
         if (previous == current)
-            return previousOddSnapping != SnapToOddDimensions
+            return previousPreferences != (SnapToOddDimensions, HudScalePercent)
                 ? ApsSettingsChangeImpact.FutureSolve
                 : ApsSettingsChangeImpact.None;
         if (previous.Problem != current.Problem) return ApsSettingsChangeImpact.TetrisSolve;
@@ -83,9 +134,11 @@ internal sealed class ApsGenerationSettings
         SymmetryType = SymmetryType,
         SymmetryMode = SymmetryMode,
         MaxTimeSeconds = MaxTimeSeconds,
-        MaxThreads = MaxThreads == MaximumThreads ? 0 : MaxThreads,
+        MaxThreads = MaxThreads == DefaultThreads ? 0 : MaxThreads,
         EarlyStopEnabled = EarlyStopEnabled,
-        ExtraLayers = ExtraLayers
+        ExtraLayers = ExtraLayers,
+        TargetDensityPercent = TargetDensityPercent,
+        HudScalePercent = HudScalePercent
     };
 
     internal void Apply(ApsSettingsData data)
@@ -93,6 +146,7 @@ internal sealed class ApsGenerationSettings
         if (!ApsSettingsData.IsSupportedSchemaVersion(data.SchemaVersion))
             throw new NotSupportedException($"Unsupported APS settings schema {data.SchemaVersion}.");
         var defaults = new ApsSettingsData();
+        data = ApsSettingsData.MigrateLegacyDefaults(data);
         TemplateShape = DefinedOr(data.TemplateShape, defaults.TemplateShape);
         HoleShape = DefinedOr(data.HoleShape, defaults.HoleShape);
         SnapToOddDimensions = data.SnapToOddDimensions;
@@ -108,10 +162,14 @@ internal sealed class ApsGenerationSettings
         SymmetryMode = DefinedOr(data.SymmetryMode, defaults.SymmetryMode);
         MaxTimeSeconds = Math.Clamp(data.MaxTimeSeconds, MinimumSeconds, MaximumSeconds);
         MaxThreads = data.MaxThreads <= 0
-            ? MaximumThreads
+            ? DefaultThreads
             : Math.Clamp(data.MaxThreads, 1, MaximumThreads);
         EarlyStopEnabled = data.EarlyStopEnabled;
         ExtraLayers = DefinedOr(data.ExtraLayers, defaults.ExtraLayers).ClampFor(TetrisType);
+        TargetDensityPercent = NormalizeStep(data.TargetDensityPercent,
+            MinimumDensityPercent, MaximumDensityPercent, DensityPercentStep);
+        HudScalePercent = NormalizeStep(data.HudScalePercent,
+            MinimumHudScalePercent, MaximumHudScalePercent, HudScalePercentStep);
 
         if (IsDepthLocked)
         {
@@ -120,6 +178,7 @@ internal sealed class ApsGenerationSettings
         requestedHoleSize = data.HoleSize;
         HoleSize = NormalizeHoleSize(requestedHoleSize);
         EnsureSymmetryIsValid();
+        ShrinkToSizeLimit();
     }
 
     internal void SetTemplateShape(ApsTemplateShape shape)
@@ -132,12 +191,34 @@ internal sealed class ApsGenerationSettings
         }
         HoleSize = NormalizeHoleSize(requestedHoleSize);
         EnsureSymmetryIsValid();
+        ShrinkToSizeLimit();
     }
 
     internal void AdjustWidth(int delta)
     {
         int step = SnapToOddDimensions ? Math.Sign(delta) * 2 : Math.Sign(delta);
+        if (delta > 0 && !CanIncreaseWidth)
+            return;
         SetWidth(Width + step);
+    }
+
+    /// <summary>False when one more width step would exceed the size limit for the current options.</summary>
+    internal bool CanIncreaseWidth
+    {
+        get
+        {
+            int next = NormalizeHorizontalDimension(Width + WidthStep, MinimumTemplateDimension);
+            return next > Width && Fits(next, IsDepthLocked ? next : Depth, SymmetryType, ApsSolveSizeLimits.Limit.Maximum);
+        }
+    }
+
+    internal bool CanIncreaseDepth
+    {
+        get
+        {
+            int next = NormalizeHorizontalDimension(Depth + WidthStep, MinimumDimension);
+            return !IsDepthLocked && next > Depth && Fits(Width, next, SymmetryType, ApsSolveSizeLimits.Limit.Maximum);
+        }
     }
 
     internal void SetWidth(int width)
@@ -146,6 +227,7 @@ internal sealed class ApsGenerationSettings
         if (IsDepthLocked)
             Depth = Width;
         HoleSize = NormalizeHoleSize(requestedHoleSize);
+        ShrinkWhileTooLarge(ShrinkWidth);
         EnsureSymmetryIsValid();
     }
 
@@ -154,6 +236,8 @@ internal sealed class ApsGenerationSettings
         if (IsDepthLocked)
             return;
         int step = SnapToOddDimensions ? Math.Sign(delta) * 2 : Math.Sign(delta);
+        if (delta > 0 && !CanIncreaseDepth)
+            return;
         SetDepth(Depth + step);
     }
 
@@ -162,6 +246,7 @@ internal sealed class ApsGenerationSettings
         if (IsDepthLocked)
             return;
         Depth = NormalizeHorizontalDimension(depth, MinimumDimension);
+        ShrinkWhileTooLarge(ShrinkDepth);
         EnsureSymmetryIsValid();
     }
 
@@ -203,6 +288,7 @@ internal sealed class ApsGenerationSettings
             : NormalizeHorizontalDimension(Depth, MinimumDimension);
         HoleSize = NormalizeHoleSize(requestedHoleSize);
         EnsureSymmetryIsValid();
+        ShrinkToSizeLimit();
     }
 
     internal void SetTetrisType(TetrisType type)
@@ -212,6 +298,7 @@ internal sealed class ApsGenerationSettings
         ComponentLength = type == TetrisType.FiveClip
             ? NormalizeFiveClipHeight(ComponentLength)
             : Math.Clamp(ComponentLength, MinimumComponentLength, MaximumComponentLength);
+        ShrinkToSizeLimit();
     }
 
     internal void SetExtraLayers(ExportExtraLayers layers) =>
@@ -224,9 +311,14 @@ internal sealed class ApsGenerationSettings
         if (symmetry == SymmetryType.Rotation90 && Width != Depth)
             return;
         SymmetryType = symmetry;
+        ShrinkToSizeLimit();
     }
 
-    internal void SetSymmetryMode(SymmetryMode mode) => SymmetryMode = mode;
+    internal void SetSymmetryMode(SymmetryMode mode)
+    {
+        SymmetryMode = mode;
+        ShrinkToSizeLimit();
+    }
 
     internal void AdjustMaxTime(int delta) =>
         MaxTimeSeconds = Math.Clamp(MaxTimeSeconds + delta, MinimumSeconds, MaximumSeconds);
@@ -236,14 +328,65 @@ internal sealed class ApsGenerationSettings
 
     internal void SetEarlyStop(bool enabled) => EarlyStopEnabled = enabled;
 
+    internal void SetTargetDensityPercent(int percent) =>
+        TargetDensityPercent = NormalizeStep(percent, MinimumDensityPercent, MaximumDensityPercent, DensityPercentStep);
+
+    internal void AdjustHudScale(int delta) =>
+        HudScalePercent = NormalizeStep(HudScalePercent + Math.Sign(delta) * HudScalePercentStep,
+            MinimumHudScalePercent, MaximumHudScalePercent, HudScalePercentStep);
+
     internal ApsGenerationRequest CreateRequest() => new(
         new TetrisProblem(
             new ApsTemplate(TemplateShape, Width, Depth, HoleShape, HoleSize),
             TetrisType,
             SymmetryType,
-            SymmetryMode),
+            SymmetryMode,
+            TargetDensityPercent),
         new ApsOutputOptions(ComponentLength, ExtraLayers),
         new ApsSolveLimits(MaxTimeSeconds, MaxThreads, EarlyStopEnabled));
+
+    private int WidthStep => SnapToOddDimensions ? 2 : 1;
+
+    /// <summary>Brings the template back within the size limit after an option lowered it.</summary>
+    private void ShrinkToSizeLimit()
+    {
+        ShrinkWhileTooLarge(() => !IsDepthLocked && Depth > Width ? ShrinkDepth() : ShrinkWidth());
+        EnsureSymmetryIsValid();
+    }
+
+    private void ShrinkWhileTooLarge(Func<bool> shrinkOnce)
+    {
+        while (IsTooLarge && shrinkOnce())
+        {
+        }
+    }
+
+    private bool ShrinkWidth()
+    {
+        int width = NormalizeHorizontalDimension(Width - WidthStep, MinimumTemplateDimension);
+        if (width >= Width)
+            return false;
+        Width = width;
+        if (IsDepthLocked)
+            Depth = Width;
+        HoleSize = NormalizeHoleSize(requestedHoleSize);
+        return true;
+    }
+
+    private bool ShrinkDepth()
+    {
+        int depth = NormalizeHorizontalDimension(Depth - WidthStep, MinimumDimension);
+        if (IsDepthLocked || depth >= Depth)
+            return false;
+        Depth = depth;
+        return true;
+    }
+
+    private static int NormalizeStep(int value, int minimum, int maximum, int step)
+    {
+        int clamped = Math.Clamp(value, minimum, maximum);
+        return Math.Clamp(minimum + (int)Math.Round((clamped - minimum) / (double)step) * step, minimum, maximum);
+    }
 
     private static T DefinedOr<T>(T value, T fallback) where T : struct, Enum =>
         Enum.IsDefined(typeof(T), value) ? value : fallback;
@@ -262,12 +405,14 @@ internal sealed class ApsGenerationSettings
         return clamped < MaximumDimension ? clamped + 1 : clamped - 1;
     }
 
-    private int NormalizeHoleSize(int size)
+    private int NormalizeHoleSize(int size) => NormalizeHoleSizeFor(Width, size);
+
+    private static int NormalizeHoleSizeFor(int width, int size)
     {
-        int minimum = Width % 2 == 0 ? 2 : 1;
-        int maximum = Math.Max(minimum, Width - 4);
+        int minimum = width % 2 == 0 ? 2 : 1;
+        int maximum = Math.Max(minimum, width - 4);
         int clamped = Math.Clamp(size, minimum, maximum);
-        if (clamped % 2 == Width % 2)
+        if (clamped % 2 == width % 2)
             return clamped;
         if (clamped + 1 <= maximum)
             return clamped + 1;
@@ -293,7 +438,25 @@ internal sealed class ApsGenerationSettings
 internal sealed class ApsSettingsData
 {
     internal const int OldestSupportedSchemaVersion = 1;
-    internal const int CurrentSchemaVersion = 1;
+    /// <summary>Version 2 changed the solver defaults; version 1 profiles are migrated on load.</summary>
+    internal const int CurrentSchemaVersion = 2;
+
+    /// <summary>
+    /// Moves version 1 values that still equal the version 1 defaults to the current defaults.
+    /// </summary>
+    internal static ApsSettingsData MigrateLegacyDefaults(ApsSettingsData data)
+    {
+        if (data.SchemaVersion >= CurrentSchemaVersion)
+            return data;
+        var migrated = (ApsSettingsData)data.MemberwiseClone();
+        migrated.SchemaVersion = CurrentSchemaVersion;
+        (SymmetryType symmetry, double seconds, bool earlyStop) =
+            ApsGenerationDefaults.Legacy.MigrateSolverDefaults(data.SymmetryType, data.MaxTimeSeconds, data.EarlyStopEnabled);
+        migrated.SymmetryType = symmetry;
+        migrated.MaxTimeSeconds = (int)seconds;
+        migrated.EarlyStopEnabled = earlyStop;
+        return migrated;
+    }
 
     internal static bool IsSupportedSchemaVersion(int schemaVersion) =>
         schemaVersion is >= OldestSupportedSchemaVersion and <= CurrentSchemaVersion;
@@ -310,8 +473,10 @@ internal sealed class ApsSettingsData
     public SymmetryType SymmetryType { get; set; } = ApsGenerationDefaults.DefaultSymmetryType;
     public SymmetryMode SymmetryMode { get; set; } = ApsGenerationDefaults.DefaultSymmetryMode;
     public int MaxTimeSeconds { get; set; } = ApsGenerationDefaults.MaxTimeSeconds;
-    // Zero means "use the maximum" so the preference follows CPU-count changes.
+    // Zero means "use the default share of the processors" so the preference follows CPU-count changes.
     public int MaxThreads { get; set; }
     public bool EarlyStopEnabled { get; set; } = ApsGenerationDefaults.EarlyStopEnabled;
     public ExportExtraLayers ExtraLayers { get; set; } = ApsGenerationDefaults.DefaultExtraLayers;
+    public int TargetDensityPercent { get; set; } = ApsGenerationSettings.MaximumDensityPercent;
+    public int HudScalePercent { get; set; } = 100;
 }

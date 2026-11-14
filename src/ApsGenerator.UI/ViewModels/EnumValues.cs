@@ -21,4 +21,8 @@ public static class EnumValues
         new(SymmetryType.Rotation180, "Rotational - 180°"),
         new(SymmetryType.Rotation90, "Rotational - 90°")
     ];
+
+    public static EnumDisplayItem<TEnum> Default<TEnum>(IReadOnlyList<EnumDisplayItem<TEnum>> values, TEnum value)
+        where TEnum : struct, Enum =>
+        values.FirstOrDefault(item => EqualityComparer<TEnum>.Default.Equals(item.Value, value)) ?? values[0];
 }

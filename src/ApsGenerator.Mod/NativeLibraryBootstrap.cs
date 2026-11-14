@@ -10,7 +10,12 @@ internal static class NativeLibraryBootstrap
     private const string GmpLibraryFileName = "libgmp.so.10";
     private const string GmpCppLibraryFileName = "libgmpxx.so.4";
     private const string WindowsLibraryFileName = "cryptominisat5.dll";
+    private const string MacLibraryFileName = "libcryptominisat5.dylib";
     private const string LinuxDynamicLoader = "libdl.so.2";
+    // dyld resolves this from the shared cache even though the file is absent on disk.
+    private const string MacDynamicLoader = "/usr/lib/libSystem.B.dylib";
+    private const int MacLoadNow = 0x2;
+    private const int MacLoadGlobal = 0x8;
     private const string WindowsDynamicLoader = "kernel32.dll";
     private const int LoadImmediately = 2;
     private const int ExportSymbolsGlobally = 0x100;
@@ -37,6 +42,14 @@ internal static class NativeLibraryBootstrap
             return;
         }
 
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            // The macOS build is universal (arm64 + x86_64) and links only system libraries.
+            nativeLibraryHandle = LoadMacLibrary(
+                Path.Combine(modDirectory, MacLibraryFileName), nativeLibraryHandle);
+            return;
+        }
+
         string packagedGmpPath = Path.Combine(modDirectory, GmpLibraryFileName);
         string gmpPath = File.Exists(packagedGmpPath) ? packagedGmpPath : GmpLibraryFileName;
         gmpLibraryHandle = LoadLinuxLibrary(
@@ -56,11 +69,33 @@ internal static class NativeLibraryBootstrap
 
     private static void EnsureSupportedPlatform()
     {
-        bool supportedOperatingSystem = RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
-            || RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-        if (!supportedOperatingSystem || RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        Architecture architecture = RuntimeInformation.ProcessArchitecture;
+        bool supported = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+            ? architecture is Architecture.X64 or Architecture.Arm64
+            : (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+              && architecture == Architecture.X64;
+        if (!supported)
             throw new PlatformNotSupportedException(
-                "APS Generator currently supports Linux x64 and Windows x64 only.");
+                "APS Generator currently supports Linux x64, Windows x64, and macOS (Apple silicon and Intel) only.");
+    }
+
+    private static nint LoadMacLibrary(string libraryPath, nint existingHandle)
+    {
+        if (existingHandle != IntPtr.Zero)
+            return existingHandle;
+
+        if (!File.Exists(libraryPath))
+            throw new FileNotFoundException("The packaged CryptoMiniSat library was not found.", libraryPath);
+
+        nint loadedHandle = MacDlopen(libraryPath, MacLoadNow | MacLoadGlobal);
+        if (loadedHandle != IntPtr.Zero)
+            return loadedHandle;
+
+        nint errorPointer = MacDlerror();
+        string loaderError = errorPointer == IntPtr.Zero
+            ? "the platform loader did not provide an error"
+            : Marshal.PtrToStringAnsi(errorPointer) ?? "unknown platform loader error";
+        throw new DllNotFoundException($"CryptoMiniSat could not be loaded from '{libraryPath}': {loaderError}");
     }
 
     private static nint LoadLinuxLibrary(
@@ -124,6 +159,12 @@ internal static class NativeLibraryBootstrap
 
     [DllImport(LinuxDynamicLoader, EntryPoint = "dlerror", CallingConvention = CallingConvention.Cdecl)]
     private static extern nint Dlerror();
+
+    [DllImport(MacDynamicLoader, EntryPoint = "dlopen", CallingConvention = CallingConvention.Cdecl)]
+    private static extern nint MacDlopen([MarshalAs(UnmanagedType.LPUTF8Str)] string fileName, int flags);
+
+    [DllImport(MacDynamicLoader, EntryPoint = "dlerror", CallingConvention = CallingConvention.Cdecl)]
+    private static extern nint MacDlerror();
 
     [DllImport(WindowsDynamicLoader, EntryPoint = "LoadLibraryExW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern nint LoadLibraryEx(string fileName, nint fileHandle, uint flags);

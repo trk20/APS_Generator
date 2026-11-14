@@ -4,12 +4,8 @@ namespace ApsGenerator.UI.Services;
 
 internal static class PlacementTargeting
 {
-    public static int TheoreticalMaxClusters(TetrisType type, int availableCells) => type switch
-    {
-        TetrisType.ThreeClip or TetrisType.FourClip => availableCells / type.EffectiveAutoloadersPerPlacement(),
-        TetrisType.FiveClip => 2 * availableCells / 9,
-        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported tetris type.")
-    };
+    public static int TheoreticalMaxClusters(TetrisType type, int availableCells) =>
+        type.TheoreticalMaxClusters(availableCells);
 
     public static int FromRatio(double ratio, int maxPlacements)
     {

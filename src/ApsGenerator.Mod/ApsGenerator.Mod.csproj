@@ -7,6 +7,10 @@
     <Nullable>enable</Nullable>
     <GameManagedDir Condition="$([MSBuild]::IsOsPlatform('Linux'))">$(HOME)/.local/share/Steam/steamapps/common/From The Depths/From_The_Depths_Data/Managed</GameManagedDir>
     <GameManagedDir Condition="$([MSBuild]::IsOsPlatform('Windows'))">C:/Program Files (x86)/Steam/steamapps/common/From The Depths/From_The_Depths_Data/Managed</GameManagedDir>
+    <GameManagedDir Condition="$([MSBuild]::IsOsPlatform('OSX'))">$(HOME)/Library/Application Support/Steam/steamapps/common/From The Depths/From_The_Depths.app/Contents/Resources/Data/Managed</GameManagedDir>
+    <!-- The macOS runtime comes from the "macOS native runtime" workflow. Set to true only for
+         local test packages that will never be uploaded. -->
+    <AllowMissingMacRuntime Condition="'$(AllowMissingMacRuntime)' == ''">false</AllowMissingMacRuntime>
   </PropertyGroup>
 
   <ItemGroup>
@@ -67,6 +71,10 @@
            Text="The Windows CryptoMiniSat library is missing. Build the Windows runtime with your local native build helpers first." />
     <Error Condition="!Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/libwinpthread-1.dll')"
            Text="The Windows MinGW threading runtime is missing. Build the Windows runtime with your local native build helpers first." />
+    <Error Condition="'$(AllowMissingMacRuntime)' != 'true' And !Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/osx/native/libcryptominisat5.dylib')"
+           Text="The macOS CryptoMiniSat library is missing. Run the 'macOS native runtime' GitHub workflow and extract its artifact into src/ApsGenerator.Solver/runtimes/osx/native, or pass -p:AllowMissingMacRuntime=true for a local test package." />
+    <Warning Condition="'$(AllowMissingMacRuntime)' == 'true' And !Exists('$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/osx/native/libcryptominisat5.dylib')"
+             Text="Staging without the macOS runtime. Do not upload this package to the Workshop." />
 
     <ItemGroup>
       <_ModManagedFiles Include="$(TargetDir)ApsGenerator.Core.dll" />
@@ -82,6 +90,7 @@
       <_ModLicenseFiles Include="$(TargetDir)LICENSES/*" />
       <_ModNativeFiles Include="$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/linux-x64/native/*" />
       <_ModNativeFiles Include="$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/win-x64/native/*" />
+      <_ModNativeFiles Include="$(MSBuildProjectDirectory)/../ApsGenerator.Solver/runtimes/osx/native/*.dylib" />
     </ItemGroup>
 
     <RemoveDir Directories="$(MSBuildProjectDirectory)/../../artifacts/mod/ApsGenerator" />

@@ -22,4 +22,8 @@
     <None Include="runtimes/win-x64/native/*.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" Link="%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <ItemGroup Condition="$(RuntimeIdentifier.StartsWith('osx')) Or ('$(RuntimeIdentifier)' == '' And $([MSBuild]::IsOsPlatform('OSX')))">
+    <None Include="runtimes/osx/native/*.dylib" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

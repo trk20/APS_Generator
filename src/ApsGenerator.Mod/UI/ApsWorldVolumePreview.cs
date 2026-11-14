@@ -37,6 +37,7 @@ internal sealed class ApsWorldVolumePreview : IDisposable
     internal void Draw(
         ApsGenerationSettings settings,
         bool hasCurrentSolution,
+        bool pointerOverHud,
         Action<Action> changeSettings)
     {
         if (!TryGetPlacementMatrix(out Matrix4x4 placementMatrix) || !EnsureMaterials())
@@ -48,7 +49,7 @@ internal sealed class ApsWorldVolumePreview : IDisposable
         DrawLines(meshes.Cooler, placementMatrix, coolerMaterial!);
         DrawMirror(meshes.Mirror, placementMatrix);
         DrawLines(meshes.Rotation, placementMatrix, mirrorWireMaterial!);
-        handles.Draw(settings, placementMatrix, hasCurrentSolution, changeSettings);
+        handles.Draw(settings, placementMatrix, hasCurrentSolution, pointerOverHud, changeSettings);
     }
 
     public void Dispose()

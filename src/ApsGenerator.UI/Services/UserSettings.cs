@@ -7,6 +7,11 @@ public sealed class UserSettings
 {
     public const string DefaultExportNameTemplate = "APS_{width}x{height}_{clips}clip_x{count}_{targetHeight}h";
 
+    /// <summary>Version 2 changed the solver defaults; older files are migrated on load.</summary>
+    public const int CurrentSettingsVersion = 2;
+
+    public int SettingsVersion { get; set; } = CurrentSettingsVersion;
+
     public TemplateShape TemplateShape { get; set; } = TemplateShape.CircleCenterHole;
 
     public int TemplateWidth { get; set; } = ApsGenerationDefaults.TemplateWidth;
@@ -39,7 +44,7 @@ public sealed class UserSettings
 
     public string? LastExportFolder { get; set; }
 
-    public int ThreadCount { get; set; } = Math.Max(1, Environment.ProcessorCount - 1);
+    public int ThreadCount { get; set; } = ApsGenerationDefaults.DefaultThreadCount;
 
     public int DefaultExportHeightBasic { get; set; } = ApsGenerationDefaults.BasicComponentHeight;
 
